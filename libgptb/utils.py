@@ -43,11 +43,13 @@ def get_model(config, data_feature):
     Returns:
         AbstractModel: the loaded model
     """
-    if config['task'] == 'GCL':
+    if config['task'] == 'GCL' or config['task'] == 'GNN':
         try:
             return getattr(importlib.import_module('libgptb.model'),
                            config['model'])(config, data_feature)
         except AttributeError:
+            
+            print(config['model'])
             raise AttributeError('model is not found')
     else:
         raise AttributeError('task is not found')
