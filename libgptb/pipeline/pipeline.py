@@ -9,6 +9,7 @@ from libgptb.utils import get_executor, get_model, get_logger, ensure_dir, set_r
 
 def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
               saved_model=True, train=True, other_args=None):
+
     """
     Args:
         task(str): task name
@@ -23,6 +24,7 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
     # load config
     config = ConfigParser(task, model_name, dataset_name,
                           config_file, saved_model, train, other_args)
+    #emb_dim2=config.get(emb_dim,0)
     exp_id = config.get('exp_id', None)
     if exp_id is None:
         # Make a new experiment ID
@@ -36,23 +38,32 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
     # seed
     seed = config.get('seed', 0)
     set_random_seed(seed)
+    print(seed)
+    
     # load dataset
-    print(config.config)
     dataset = get_dataset(config)
     # transform the dataset and split
     data = dataset.get_data()
-    # train_data, valid_data, test_data = data
-    train_data = data
-    valid_data = data
-    test_data = data
-  
+
+    if task=="SGC":
+        train_data = data.get('train')
+        valid_data = data.get('valid')
+        test_data = data.get('test')
+    elif task=="GCL":
+        train_data = data
+        valid_data = data
+        test_data = data
     data_feature = dataset.get_data_feature()
-    # load executor
+
+
+    
+    #load executor
     model_cache_file = './libgptb/cache/{}/model_cache/{}_{}.m'.format(
         exp_id, model_name, dataset_name)
     model = get_model(config, data_feature)
-    print(config['model'])
     executor = get_executor(config, model, data_feature)
+
+
     # train
     if train or not os.path.exists(model_cache_file):
         executor.train(train_data, valid_data)
@@ -60,8 +71,7 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
             executor.save_model(model_cache_file)
     else:
         executor.load_model(model_cache_file)
-    # evaluate and the result will be under cache/evaluate_cache
+    #evaluate and the result will be under cache/evaluate_cache
     executor.evaluate(test_data)
     
-
 

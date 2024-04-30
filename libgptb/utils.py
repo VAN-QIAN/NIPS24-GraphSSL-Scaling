@@ -24,7 +24,6 @@ def get_executor(config, model, data_feature):
     """
     # getattr(importlib.import_module('libgptb.executors'),
     #                     config['executor'])(config, model, data_feature)
-
     try:
         return getattr(importlib.import_module('libgptb.executors'),
                        config['executor'])(config, model, data_feature)
@@ -43,7 +42,7 @@ def get_model(config, data_feature):
     Returns:
         AbstractModel: the loaded model
     """
-    if config['task'] == 'GCL':
+    if config['task'] == 'GCL' or config['task'] == 'SGC':
         try:
             return getattr(importlib.import_module('libgptb.model'),
                            config['model'])(config, data_feature)
@@ -84,8 +83,12 @@ def get_logger(config, name=None):
     log_dir = './libgptb/log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    log_filename = '{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
-                                            config['config_file'], config['exp_id'], get_local_time())
+    if config['task']=="SSL":
+        log_filename = '{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
+                                                config['config_file'], config['exp_id'], get_local_time())
+    else:
+        log_filename = '{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
+                                                config['exp_id'], get_local_time())
     logfilepath = os.path.join(log_dir, log_filename)
 
     logger = logging.getLogger(name)
