@@ -12,7 +12,7 @@ import logging
 from tqdm import tqdm
 import numpy as np
 import torch
-
+from torch import optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
 
@@ -38,8 +38,12 @@ from functools import partial
 from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
 class MAEExecutor(AbstractExecutor):
     def __init__(self, config, model, data_feature):
+        self.exp_id = self.config.get('exp_id', None)
+
+        self.cache_dir = './libgptb/cache/{}/model_cache'.format(self.exp_id)
         self.config=config
-        self.evaluator=Evaluator(self.config.get('dataset'))
+        self.evaluator=get_evaluator(config)
+        self.model=build_model(config)
         self.data_feature=data_feature
         self.device = self.config.get('device', torch.device('cpu'))
         self.model=model.gnn.to(self.device)
@@ -99,6 +103,7 @@ class MAEExecutor(AbstractExecutor):
         Args:
             epoch(int): 轮数
         """
+        
         ensure_dir(self.cache_dir)
         config = dict()
         config['model_state_dict'] = self.model.state_dict()
@@ -201,46 +206,108 @@ class MAEExecutor(AbstractExecutor):
         test_std = np.std(result)
 
         return test_f1, test_std
-    def evaluate(self,test_dataloader):
-    
-        for i, seed in enumerate(self.seeds):
-            print(f"####### Run {i} for seed {seed}")
-            set_random_seed(seed)
+    def evaluate(self, dataloader):
+        """
+        use model to test data
+
+        Args:
+            test_dataloader(torch.Dataloader): Dataloader
+        """
+        self._logger.info('Start evaluating ...')
+        #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
+        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+            self.load_model_with_epoch(epoch_idx)
+            self.model.encoder_model.eval()
+            x = []
+            y = []
+            for data in dataloader:
+                data = data.to('cuda')
+                if data.x is None:
+                    num_nodes = data.batch.size(0)
+                    data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
+                _, _, g1, g2 = self.model.encoder_model(data.x, data.edge_index, data.batch)
+                x.append(g1 + g2)
+                y.append(data.y)
+            x = torch.cat(x, dim=0)
+            y = torch.cat(y, dim=0)
+
+            split = get_split(num_samples=x.size()[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
+            result = SVMEvaluator()(x, y, split)
+            print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
+
+
+            self._logger.info('Evaluate result is ' + json.dumps(result))
+            filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
+                        self.config['model'] + '_' + self.config['dataset']
+            save_path = self.evaluate_res_dir
+            with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
+                json.dump(result, f)
+                self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
+    def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
+        opt_lower = opt.lower()
+
+        parameters = model.parameters()
+        opt_args = dict(lr=lr, weight_decay=weight_decay)
+
+        opt_split = opt_lower.split("_")
+        opt_lower = opt_split[-1]
+        if opt_lower == "adam":
+            optimizer = optim.Adam(parameters, **opt_args)
+        elif opt_lower == "adamw":
+            optimizer = optim.AdamW(parameters, **opt_args)
+        elif opt_lower == "adadelta":
+            optimizer = optim.Adadelta(parameters, **opt_args)
+        elif opt_lower == "radam":
+            optimizer = optim.RAdam(parameters, **opt_args)
+        elif opt_lower == "sgd":
+            opt_args["momentum"] = 0.9
+            return optim.SGD(parameters, **opt_args)
+        else:
+            assert False and "Invalid optimizer"
+
+        return optimizer
+    def train(self, train_dataloader, eval_dataloader):
+        """
+        use data to train model with config
+
+        Args:
+            train_dataloader(torch.Dataloader): Dataloader
+            eval_dataloader(torch.Dataloader): Dataloader
+        """
+        self._logger.info('Start training ...')
+        min_val_loss = float('inf')
+        wait = 0
+        best_epoch = 0
+        train_time = []
+        eval_time = []
+        num_batches = len(train_dataloader)
+        self._logger.info("num_batches:{}".format(num_batches))
+        epoch_idx=0
+        for epoch_idx in 1000:
+            print(f"####### Running for epoch {epoch_idx}")
+            #set_random_seed(seed)
 
             if self.logs:
-                logger = TBLogger(name=f"{test_dataloader}_loss_{self.loss_fn}_rpr_{self.replace_rate}_nh_{self.num_hidden}_nl_{self.num_layers}_lr_{self.lr}_mp_{self.max_epoch}_mpf_{self.max_epoch_f}_wd_{self.weight_decay}_wdf_{self.weight_decay_f}_{self.encoder_type}_{self.decoder_type}")
+                logger = TBLogger(name=f"{self.dataset_name}_loss_{self.loss_fn}_rpr_{self.replace_rate}_nh_{self.num_hidden}_nl_{self.num_layers}_lr_{self.lr}_mp_{self.max_epoch}_mpf_{self.max_epoch_f}_wd_{self.weight_decay}_wdf_{self.weight_decay_f}_{self.encoder_type}_{self.decoder_type}")
             else:
                 logger = None
 
-            model = build_model(self.config)
-            model.to(self.device)
-            optimizer = create_optimizer(self.optim_type, model, self.lr, self.weight_decay)
+            self.model = build_model(self.config)
+            self.model.to(self.device)
+            optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
 
-            if self.use_scheduler:
-                self.logging.info("Use schedular")
-                scheduler = lambda epoch :( 1 + np.cos((epoch) * np.pi / self.max_epoch) ) * 0.5
-            # scheduler = lambda epoch: epoch / warmup_steps if epoch < warmup_steps \
-                    # else ( 1 + np.cos((epoch - warmup_steps) * np.pi / (max_epoch - warmup_steps))) * 0.5
-                scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=scheduler)
-            else:
-                scheduler = None
-            
-            if not self.load_model:
-                
-                model = self.pretrain(model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, scheduler, self.num_classes, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self.logger)
-                model = model.cpu()
-
-            if self.load_model:
-                self.logging.info("Loading Model ... ")
-                model.load_state_dict(torch.load("checkpoint.pt"))
-            if self.save_model:
-                self.logging.info("Saveing Model ...")
-                torch.save(model.state_dict(), "checkpoint.pt")
         
-            model = model.to(self.device)
-            model.eval()
-            test_f1 = self.graph_classification_evaluation(model, pooler, eval_loader, num_classes, lr_f, weight_decay_f, max_epoch_f, device, mute=False)
-            acc_list.append(test_f1)
+            
+            
+            self.model = self.pretrain(self.create_optimizermodel, self.pooler, (self.train_loader, self.eval_loader), optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob,  logger)
+            self.model = self.model.cpu()
+            if epoch_idx+1 in [10,20,40,60,80,100]:
+                model_file_name = self.save_model_with_epoch(epoch_idx)
+                self._logger.info('saving to {}'.format(model_file_name))
 
-    final_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
-    print(f"# final_acc: {final_acc:.4f}±{final_acc_std:.4f}")    
+            
+        
+    
+        return
+
+    
