@@ -15,7 +15,7 @@ import torch
 from torch import optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
-
+from libgptb.evaluators import get_split, SVMEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score
@@ -44,11 +44,12 @@ class MAEExecutor(AbstractExecutor):
         self.config=config
         self.evaluator=get_evaluator(config)
         self.model=build_model(config)
+        #self.model.enco
         self.data_feature=data_feature
         self.device = self.config.get('device', torch.device('cpu'))
         self.model=model.gnn.to(self.device)
         self.exp_id = self.config.get('exp_id', None)
-        self.device = config.device if args.device >= 0 else "cpu"
+        self.device = config.device if config.device >= 0 else "cpu"
         self.seeds = config.seeds
         self.dataset_name = config.dataset
         self.max_epoch = config.max_epoch
@@ -283,7 +284,7 @@ class MAEExecutor(AbstractExecutor):
         num_batches = len(train_dataloader)
         self._logger.info("num_batches:{}".format(num_batches))
         epoch_idx=0
-        for epoch_idx in 1000:
+        for epoch_idx in 200:
             print(f"####### Running for epoch {epoch_idx}")
             #set_random_seed(seed)
 

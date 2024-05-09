@@ -49,7 +49,7 @@ class simclr(nn.Module):
     self.prior = False
 
     self.embedding_dim = mi_units = hidden_dim * num_gc_layers
-    self.encoder = Encoder(dataset_num_features, hidden_dim, num_gc_layers)
+    self.encoder_model = Encoder(dataset_num_features, hidden_dim, num_gc_layers)
 
     self.proj_head = nn.Sequential(nn.Linear(self.embedding_dim, self.embedding_dim), nn.ReLU(inplace=True), nn.Linear(self.embedding_dim, self.embedding_dim))
 
