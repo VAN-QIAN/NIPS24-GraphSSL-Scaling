@@ -6,7 +6,7 @@ import torch
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from torch_geometric.io import read_tu_data
 from libgptb.data.dataset.abstract_dataset import AbstractDataset
-from torch_geometric.data import DataLoader 
+from torch_geometric.loader import DataLoader 
 
 from itertools import repeat, product
 import numpy as np

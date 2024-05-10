@@ -107,7 +107,7 @@ class GINExecutor(AbstractExecutor):
         self._logger.info("Loaded model at {}".format(epoch))
     
         
-    def train(self, train_dataloader, eval_dataloader):
+    def train(self, train_dataloader, eval_dataloader, test_dataloader):
         valid_curve = []
         test_curve = []
         val_loss_curve = []
@@ -122,17 +122,19 @@ class GINExecutor(AbstractExecutor):
             self._logger.info("epoch complete!")
             self._logger.info("evaluating now!")
             valid_perf,val_loss = _eval_epoch(self.model, self.device, eval_dataloader, self.evaluator, self.task_type)
-            # test_perf, test_loss = _eval_epoch(self.model, self.device, test_dataloader, self.evaluator, self.task_type)
+            test_perf, test_loss = _eval_epoch(self.model, self.device, test_dataloader, self.evaluator, self.task_type)
             message = 'Epoch [{}/{}] train_loss: {:.4f}'.\
                     format(epoch, self.epochs, train_loss)
             self._logger.info(message)
             if min_loss>val_loss:
                 self.save_model_with_epoch(epoch)
+                min_loss=val_loss
+                self.best_val_epoch = epoch
             
             valid_curve.append(valid_perf[self.data_feature.get('eval_metric')])
             val_loss_curve.append(val_loss)
-            # test_curve.append(test_perf[self.data_feature.get('eval_metric')])
-            # test_loss_curve.append(test_loss)
+            test_curve.append(test_perf[self.data_feature.get('eval_metric')])
+            test_loss_curve.append(test_loss)
 
         if 'classification' in self.data_feature.get('task_type'):
             best_val_epoch = np.argmax(np.array(valid_curve))
@@ -144,13 +146,13 @@ class GINExecutor(AbstractExecutor):
         self.best_val_loss_epoch=best_val_loss_epoch
 
         self._logger.info('Finished training!')
-        self._logger.info('Best validation score: {}'.format(valid_curve[best_val_epoch]))
+        self._logger.info('Best validation score: {}'.format(valid_curve[self.best_val_epoch]))
         self._logger.info('Best val loss: {}'.format(val_loss_curve[best_val_loss_epoch]))
-        # self._logger.info('Test score: {}'.format(test_curve[best_val_epoch]))
-        # self._logger.info('Best test loss: {}'.format(test_loss_curve[best_val_loss_epoch]))
-        # message = 'best val score: {},best val loss:{}'.\
-        #             format(valid_curve[best_val_epoch], val_loss_curve[best_val_loss_epoch])
-        # self._logger.info(message)
+        self._logger.info('Test score: {}'.format(test_curve[best_val_epoch]))
+        self._logger.info('Best test loss: {}'.format(test_loss_curve[best_val_loss_epoch]))
+        message = 'best val score: {},best val loss:{}'.\
+                    format(valid_curve[best_val_epoch], val_loss_curve[best_val_loss_epoch])
+        self._logger.info(message)
     def evaluate(self, test_dataloader):
         """
         use model to test data
