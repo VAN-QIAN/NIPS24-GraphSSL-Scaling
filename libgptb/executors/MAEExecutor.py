@@ -186,27 +186,7 @@ class MAEExecutor(AbstractExecutor):
         return test_f1
 
 
-    def evaluate_graph_embeddings_using_svm(embeddings, labels):
-        result = []
-        kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
 
-        for train_index, test_index in kf.split(embeddings, labels):
-            x_train = embeddings[train_index]
-            x_test = embeddings[test_index]
-            y_train = labels[train_index]
-            y_test = labels[test_index]
-            params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
-            svc = SVC(random_state=42)
-            clf = GridSearchCV(svc, params)
-            clf.fit(x_train, y_train)
-
-            preds = clf.predict(x_test)
-            f1 = f1_score(y_test, preds, average="micro")
-            result.append(f1)
-        test_f1 = np.mean(result)
-        test_std = np.std(result)
-
-        return test_f1, test_std
     def evaluate(self, dataloader):
         """
         use model to test data
