@@ -13,6 +13,14 @@ from libgptb.data.dataset.abstract_dataset import AbstractDataset
 from torch_geometric.utils import degree,add_self_loops, remove_self_loops, to_undirected
 import importlib
 from torch_geometric.loader import DataLoader
+import dgl
+from dgl.data import (
+    load_data, 
+    TUDataset, 
+    CoraGraphDataset, 
+    CiteseerGraphDataset, 
+    PubmedGraphDataset
+)
 class TUDataset_MAE(AbstractDataset):
     def __init__(self, config):
         self.config = config
@@ -21,10 +29,11 @@ class TUDataset_MAE(AbstractDataset):
         self.train_ratio = self.config.get("train_ratio",0.8)
         self.valid_ratio = self.config.get("valid_ratio",0.1)
         self.test_ratio = self.config.get("test_ratio",0.1)
-        if self.datasetName in ["MUTAG", "MCF-7", "MOLT-4","P388","ZINC_full","reddit_threads"]:   
-            tu_dataset = getattr(importlib.import_module('torch_geometric.datasets'), 'TUDataset')
-        self.dataset = tu_dataset(root="./data", name=self.datasetName)
-        self.dataset.num_features=0
+        dataset = TUDataset(self.dataset_name)
+        self.num_features=0
+        self.num_classes=0
+        self.get_data()
+
         #self._load_data()
         self.ratio = self.config.get('ratio', 0)
 #
@@ -89,7 +98,8 @@ class TUDataset_MAE(AbstractDataset):
             self.dataset[i].edge_index = remove_self_loops(self.dataset[i].edge_index)[0]
             self.dataset[i].edge_index = add_self_loops(self.dataset[i].edge_index)[0]
     #dataset = [(g, g.y) for g in dataset]
-        self.dataset.num_features=feature_dim
+        self.num_features=feature_dim
+        self.num_classes=num_classes
         print(f"******** # Num Graphs: {len(self.dataset)}, # Num Feat: {feature_dim}, # Num Classes: {num_classes} ********")
         return self.dataset, (feature_dim, num_classes)
         
@@ -104,7 +114,7 @@ class TUDataset_MAE(AbstractDataset):
         """
         
         return {
-            "input_dim": max(self.dataset.num_features, 1)
+            "input_dim": max(self.num_features, 1)
         }
 
 
