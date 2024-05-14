@@ -150,13 +150,16 @@ class MAEExecutor(AbstractExecutor):
 
     def pretrain(self, model, pooler, dataloaders, optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob=True, logger=None):
         train_loader, eval_loader = dataloaders
-        print("Length of train_loader:", len(train_loader))
+
         epoch_iter = tqdm(range(max_epoch))
         for epoch in epoch_iter:
             model.train()
             loss_list = []
-            for idx, batch in enumerate(train_loader):
-                print(f"Epoch {epoch}, Batch {idx}")
+            for batch in train_loader:
+                print(epoch)
+                print(len(train_loader))
+                print(batch)
+                print(batch)
                 batch_g = batch
                 batch_g = batch_g.to(device)
 
