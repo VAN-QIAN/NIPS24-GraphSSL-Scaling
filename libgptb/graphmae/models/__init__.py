@@ -2,28 +2,30 @@ from .edcoder import PreModel
 
 
 def build_model(args):
-    num_heads = args.num_heads
-    num_out_heads = args.num_out_heads
-    num_hidden = args.num_hidden
-    num_layers = args.num_layers
-    residual = args.residual
-    attn_drop = args.attn_drop
-    in_drop = args.in_drop
-    norm = args.norm
-    negative_slope = args.negative_slope
-    encoder_type = args.encoder
-    decoder_type = args.decoder
-    mask_rate = args.mask_rate
-    drop_edge_rate = args.drop_edge_rate
-    replace_rate = args.replace_rate
+    num_heads = args['num_heads']
+    num_out_heads = args['num_out_heads']
+    num_hidden = args["num_hidden"]
+    num_layers = args["num_layers"]
+    residual = args["residual"]
+    attn_drop = args["attn_drop"]
+    in_drop = args["in_drop"]
+    norm = args['norm']
+    negative_slope = args['negative_slope']
+    encoder_type = args['encoder']
+    decoder_type = args['decoder']
+    mask_rate = args['mask_rate']
+    drop_edge_rate = args['drop_edge_rate']
+    replace_rate = args['replace_rate']
 
 
-    activation = args.activation
-    loss_fn = args.loss_fn
-    alpha_l = args.alpha_l
-    concat_hidden = args.concat_hidden
-    num_features = args.num_features
-
+    activation = args['activation']
+    loss_fn = args['loss_fn']
+    alpha_l = args['alpha_l']
+    concat_hidden = args['concat_hidden']
+    num_features =args['num_feature']['num_features']
+    print(args['num_feature'])
+    print(concat_hidden)
+    print(type(num_hidden))
 
     model = PreModel(
         in_dim=int(num_features),

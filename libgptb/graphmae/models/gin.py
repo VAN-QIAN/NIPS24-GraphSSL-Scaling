@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from torch_geometric.nn import GINConv, MLP
-from graphmae.utils import create_activation, NormLayer, create_norm
+from libgptb.graphmae.utils import create_activation, NormLayer, create_norm
 
 
 class GIN(nn.Module):

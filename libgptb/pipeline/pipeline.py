@@ -43,6 +43,7 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
     ratio = config.get('ratio', 0)
     # load dataset
     dataset = get_dataset(config)
+    print("get dataset finisheds")
     # transform the dataset and split
     data = dataset.get_data()
 
@@ -60,13 +61,14 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
   
 
     data_feature = dataset.get_data_feature()
-
-
+    config['num_feature']=data_feature
+    
     
     #load executor
     model_cache_file = './libgptb/cache/{}/model_cache/{}_{}.m'.format(
         exp_id, model_name, dataset_name)
     model = get_model(config, data_feature)
+    print(model)
     executor = get_executor(config, model, data_feature)
 
 

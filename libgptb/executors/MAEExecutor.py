@@ -19,7 +19,7 @@ from libgptb.evaluators import get_split, SVMEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score
-
+from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 from libgptb.graphmae.utils import (
     build_args,
     create_optimizer,
@@ -37,45 +37,62 @@ from libgptb.utils import get_evaluator, ensure_dir
 from libgptb.evaluators import get_split, LREvaluator
 from functools import partial
 from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
+from logging import getLogger
 class MAEExecutor(AbstractExecutor):
     def __init__(self, config, model, data_feature):
+        print("enter initialize")
+        self.config=config
         self.exp_id = self.config.get('exp_id', None)
-
+        print("first")
         self.cache_dir = './libgptb/cache/{}/model_cache'.format(self.exp_id)
         self.config=config
+        self._logger = getLogger()
+        print("next2")
+        print(config['num_heads'])
+
+
+        if config['pooling'] == "mean":
+            self.pooler = AvgPooling()
+        elif config['pooling'] == "max":
+            self.pooler = MaxPooling()
+        elif config['pooling'] == "sum":
+            self.pooler = SumPooling()
         self.evaluator=get_evaluator(config)
-        self.model=build_model(config)
+        print("next3")
+        #self.model=build_model(config)
         #self.model.enco
+        print("next")
         self.data_feature=data_feature
         self.device = self.config.get('device', torch.device('cpu'))
-        self.model=model.gnn.to(self.device)
+        #self.model=model.gnn.to(self.device)
         self.exp_id = self.config.get('exp_id', None)
-        self.device = config.device if config.device >= 0 else "cpu"
-        self.seeds = config.seeds
-        self.dataset_name = config.dataset
-        self.max_epoch = config.max_epoch
-        self.max_epoch_f =config.max_epoch_f
-        self.num_hidden = config.num_hidden
-        self.num_layers = config.num_layers
-        self.encoder_type = config.encoder
-        self.decoder_type = config.decoder
-        self.replace_rate = config.replace_rate
+        self.device = config.get('device',0)
+        #self.seeds = config['seeds']
+        self.dataset_name = config['dataset']
+        self.max_epoch = config['max_epoch']
+        self.max_epoch_f =config['max_epoch_f']
+        self.num_hidden = config['num_hidden']
+        self.num_layers = config['num_layers']
+        self.encoder_type = config['encoder']
+        self.decoder_type = config['decoder']
+        self.replace_rate = config['replace_rate']
 
-        self.optim_type = config.optimizer 
-        self.loss_fn = config.loss_fn
+        self.optim_type = config['optimizer'] 
+        self.loss_fn = config['loss_fn']
 
-        self.lr = config.lr
-        self.weight_decay = config.weight_decay
-        self.lr_f = config.lr_f
-        self.weight_decay_f = config.weight_decay_f
-        self.linear_prob = config.linear_prob
-        self.load_model = config.load_model
-        self.save_model = config.save_model
-        self.logs = config.logging
-        self.use_scheduler = config.scheduler
-        self.pooler = config.pooling
-        self.deg4feat = config.deg4feat
-        self.batch_size = config.batch_size
+        self.lr = config['lr']
+        self.weight_decay = config['weight_decay']
+        self.lr_f = config['lr_f']
+        self.weight_decay_f = config['weight_decay_f']
+        self.linear_prob = config['linear_prob']
+        #self.scheduler
+        self.logs = config['logging']
+        self.scheduler = config['scheduler']
+        self.pooler = config['pooling']
+        self.deg4feat = config['deg4feat']
+        self.batch_size = config['batch_size']
+        self.model=build_model(config)
+        self._logger.info(self.model)
     def save_model(self, cache_name):
         """
         将当前的模型保存到文件
@@ -131,21 +148,22 @@ class MAEExecutor(AbstractExecutor):
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self._logger.info("Loaded model at {}".format(epoch))
 
-    def pretrain(model, pooler, dataloaders, optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob=True, logger=None):
+    def pretrain(self, model, pooler, dataloaders, optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob=True, logger=None):
         train_loader, eval_loader = dataloaders
-
+        print("Length of train_loader:", len(train_loader))
         epoch_iter = tqdm(range(max_epoch))
         for epoch in epoch_iter:
             model.train()
             loss_list = []
-            for batch in train_loader:
+            for idx, batch in enumerate(train_loader):
+                print(f"Epoch {epoch}, Batch {idx}")
                 batch_g = batch
                 batch_g = batch_g.to(device)
 
                 feat = batch_g.x
                 model.train()
                 loss, loss_dict = model(feat, batch_g.edge_index)
-            
+        
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -156,9 +174,10 @@ class MAEExecutor(AbstractExecutor):
                     logger.note(loss_dict, step=epoch)
             if scheduler is not None:
                 scheduler.step()
-        epoch_iter.set_description(f"Epoch {epoch} | train_loss: {np.mean(loss_list):.4f}")
-        
+            epoch_iter.set_description(f"Epoch {epoch} | train_loss: {np.mean(loss_list):.4f}")
+
         return model
+
     def graph_classification_evaluation(self,model, pooler, dataloader, num_classes, lr_f, weight_decay_f, max_epoch_f, device, mute=False):
         model.eval()
         x_list = []
@@ -263,9 +282,11 @@ class MAEExecutor(AbstractExecutor):
         train_time = []
         eval_time = []
         num_batches = len(train_dataloader)
+        print("num bac")
+        print(len(train_dataloader))
         self._logger.info("num_batches:{}".format(num_batches))
         epoch_idx=0
-        for epoch_idx in 200:
+        for epoch_idx in range(200):
             print(f"####### Running for epoch {epoch_idx}")
             #set_random_seed(seed)
 
@@ -281,7 +302,7 @@ class MAEExecutor(AbstractExecutor):
         
 
             
-            self.model = self.pretrain(self.create_optimizermodel, self.pooler, (self.train_loader, self.eval_loader), optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob,  logger)
+            self.model = self.pretrain(self.model, self.pooler, (train_dataloader, eval_dataloader), optimizer, self.max_epoch, self.device, self.scheduler, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
             self.model = self.model.cpu()
             if epoch_idx+1 in [10,20,40,60,80,100]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)

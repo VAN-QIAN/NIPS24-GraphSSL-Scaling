@@ -14,7 +14,7 @@ from torch_geometric.utils import softmax
 from torch_geometric.nn.inits import glorot, zeros
 
 
-from graphmae.utils import create_activation
+from libgptb.graphmae.utils import create_activation
 
 
 class GAT(nn.Module):
