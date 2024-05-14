@@ -28,6 +28,7 @@ from libgptb.graphmae.utils import (
     get_current_lr,
     load_best_configs,
 )
+
 from libgptb.graphmae.datasets.data_util import load_graph_classification_dataset
 from libgptb.graphmae.models import build_model
 from torch.utils.tensorboard import SummaryWriter
@@ -278,7 +279,7 @@ class MAEExecutor(AbstractExecutor):
             optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
 
         
-            
+
             
             self.model = self.pretrain(self.create_optimizermodel, self.pooler, (self.train_loader, self.eval_loader), optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob,  logger)
             self.model = self.model.cpu()
