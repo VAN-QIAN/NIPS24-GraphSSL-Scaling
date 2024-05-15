@@ -36,6 +36,7 @@ def collate_fn(batch):
 class TUDataset_MAE(AbstractDataset):
     
     def __init__(self, config):
+        
         self.config = config
         self.datasetName = self.config.get('dataset', '')
         self.batch_size = self.config.get('batch_size', 64)
@@ -45,7 +46,7 @@ class TUDataset_MAE(AbstractDataset):
         #self.dataset=TUDataset(root="./data",name=self.datasetName)
         self.dataset=TUDataset(self.datasetName)
         #self._load_data()
-        self.split_ratio = self.config.get('ratio', 0)
+        self.split_ratio = self.config.get('ratio', 0.1)
         if self.split_ratio != 0:
             self.split_for_train(self.split_ratio)
             print("split generated")
@@ -128,8 +129,7 @@ class TUDataset_MAE(AbstractDataset):
             train_path = f"./split/{self.datasetName}/{self.datasetName}_train{self.train_ratio}_{self.split_ratio}.pt"
             train_indices = torch.load(train_path)
             train_set = [self.dataset[i] for i in train_indices]
-        train_idx = torch.arange(len(self.dataset))
-        print(len(self.dataset))
+        train_idx = torch.arange(len(train_set))
         train_sampler = SubsetRandomSampler(train_idx)
         #dataset1= CustomDataset(self.dataset)
         dataloader = GraphDataLoader(train_set, sampler=train_sampler, collate_fn=collate_fn, batch_size=self.config['batch_size'], pin_memory=True)
