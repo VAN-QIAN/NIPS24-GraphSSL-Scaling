@@ -1,7 +1,7 @@
 {
     "gpu": true,
     "gpu_id": 3,
-    "max_epoch": 10000,
+    "max_epoch": 2,
     "train_loss": "none",
     "epoch": 0,
     "learner": "adam",
@@ -44,6 +44,6 @@
     "scheduler":false,
     "pooling":"mean",
     "deg4feat":false,
-    "batch_size":32,
+    "batch_size":5,
     "concat_hidden":false
   }

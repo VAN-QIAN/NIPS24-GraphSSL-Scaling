@@ -22,6 +22,7 @@ from dgl.data import (
 from libgptb.data.dataset.abstract_dataset import AbstractDataset
 import importlib
 from torch_geometric.loader import DataLoader
+from dgl.dataloading import GraphDataLoader
 
 from copy import deepcopy
 import pdb
@@ -75,7 +76,7 @@ class TUDataset_MAE(AbstractDataset):
                     feature_dim = max(feature_dim, g.ndata["node_labels"].max().item())
             
                 feature_dim += 1
-                for g, l in dataset:
+                for g, l in self.dataset:
                     node_label = g.ndata["node_labels"].view(-1)
                     feat = F.one_hot(node_label, num_classes=feature_dim).float()
                     g.ndata["attr"] = feat
@@ -131,9 +132,9 @@ class TUDataset_MAE(AbstractDataset):
         print(len(self.dataset))
         train_sampler = SubsetRandomSampler(train_idx)
         #dataset1= CustomDataset(self.dataset)
-        dataloader = DataLoader(train_set, sampler=train_sampler, collate_fn=collate_fn, batch_size=self.config['batch_size'], pin_memory=True)
+        dataloader = GraphDataLoader(train_set, sampler=train_sampler, collate_fn=collate_fn, batch_size=self.config['batch_size'], pin_memory=True)
         # dataloader = DataLoader(self.dataset, batch_size=self.batch_size)
-        dataloader_eval = DataLoader(self.dataset, collate_fn=collate_fn, batch_size=self.config['batch_size'], shuffle=False)
+        dataloader_eval = GraphDataLoader(self.dataset, collate_fn=collate_fn, batch_size=self.config['batch_size'], shuffle=False)
 
         return{"train":dataloader,"valid":dataloader_eval,"test":dataloader_eval,"full":dataloader}
         

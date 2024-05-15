@@ -56,7 +56,7 @@
 
     "SGC":{
         "allowed_model":["GIN","GraphCL","GraphMAE"],
-        "allowed_dataset":["ogbg-molhiv","ogbg-ppa","AIDS","MCF-7","IMDB-BINARY","MOLT-4","BZR","P388","ZINC_full","reddit_threads","MUTAG","PTC_MR","DD","PROTEINS","NCI1","NCI109"],
+        "allowed_dataset":["ogbg-molhiv","ogbg-ppa","AIDS","MCF-7","IMDB-BINARY","MOLT-4","BZR","P388","ZINC_full","reddit_threads","MUTAG","PTC_MR","DD","PROTEINS","NCI1","NCI109","github_stargazers"],
         "GIN": {
             "dataset_class": "SGCDataset",
             "executor": "GINExecutor",

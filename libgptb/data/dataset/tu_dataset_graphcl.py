@@ -15,7 +15,7 @@ from copy import deepcopy
 import pdb
 
 class TUDataset_graphcl(AbstractDataset):
-
+    
     def __init__(self, config):
         self.config = config
         self.datasetName = self.config.get('dataset', '')

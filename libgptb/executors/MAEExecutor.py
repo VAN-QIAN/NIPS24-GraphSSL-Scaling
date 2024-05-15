@@ -1,4 +1,15 @@
 import os
+import dgl
+from dgl.data import (
+    load_data, 
+    TUDataset, 
+    CoraGraphDataset, 
+    CiteseerGraphDataset, 
+    PubmedGraphDataset
+)
+from torch.utils.data.sampler import SubsetRandomSampler
+from dgl.dataloading import GraphDataLoader
+import torch.nn.functional as F
 import time
 import json
 import numpy as np
@@ -28,7 +39,7 @@ from libgptb.graphmae.utils import (
     get_current_lr,
     load_best_configs,
 )
-
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from libgptb.graphmae.datasets.data_util import load_graph_classification_dataset
 from libgptb.graphmae.models import build_model
 from torch.utils.tensorboard import SummaryWriter
@@ -38,8 +49,89 @@ from libgptb.evaluators import get_split, LREvaluator
 from functools import partial
 from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
 from logging import getLogger
+def evaluate_graph_embeddings_using_svm(embeddings, labels):
+    result = []
+    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
+
+    for train_index, test_index in kf.split(embeddings, labels):
+        x_train = embeddings[train_index]
+        x_test = embeddings[test_index]
+        y_train = labels[train_index]
+        y_test = labels[test_index]
+        params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
+        svc = SVC(random_state=42)
+        clf = GridSearchCV(svc, params)
+        clf.fit(x_train, y_train)
+
+        preds = clf.predict(x_test)
+        f1 = f1_score(y_test, preds, average="micro")
+        result.append(f1)
+    test_f1 = np.mean(result)
+    test_std = np.std(result)
+
+    return test_f1, test_std
+def collate_fn(batch):
+    # graphs = [x[0].add_self_loop() for x in batch]
+    graphs = [x[0] for x in batch]
+    labels = [x[1] for x in batch]
+    batch_g = dgl.batch(graphs)
+    labels = torch.cat(labels, dim=0)
+    return batch_g, labels
+def load_graph_classification_dataset(dataset_name, deg4feat=False):
+    dataset_name = dataset_name.upper()
+    dataset = TUDataset(dataset_name)
+    graph, _ = dataset[0]
+
+    if "attr" not in graph.ndata:
+        if "node_labels" in graph.ndata and not deg4feat:
+            print("Use node label as node features")
+            feature_dim = 0
+            for g, _ in dataset:
+                feature_dim = max(feature_dim, g.ndata["node_labels"].max().item())
+            
+            feature_dim += 1
+            for g, l in dataset:
+                node_label = g.ndata["node_labels"].view(-1)
+                feat = F.one_hot(node_label, num_classes=feature_dim).float()
+                g.ndata["attr"] = feat
+        else:
+            print("Using degree as node features")
+            feature_dim = 0
+            degrees = []
+            for g, _ in dataset:
+                feature_dim = max(feature_dim, g.in_degrees().max().item())
+                degrees.extend(g.in_degrees().tolist())
+            MAX_DEGREES = 400
+
+            oversize = 0
+            for d, n in Counter(degrees).items():
+                if d > MAX_DEGREES:
+                    oversize += n
+            # print(f"N > {MAX_DEGREES}, #NUM: {oversize}, ratio: {oversize/sum(degrees):.8f}")
+            feature_dim = min(feature_dim, MAX_DEGREES)
+
+            feature_dim += 1
+            for g, l in dataset:
+                degrees = g.in_degrees()
+                degrees[degrees > MAX_DEGREES] = MAX_DEGREES
+                
+                feat = F.one_hot(degrees, num_classes=feature_dim).float()
+                g.ndata["attr"] = feat
+    else:
+        print("******** Use `attr` as node features ********")
+        feature_dim = graph.ndata["attr"].shape[1]
+
+    labels = torch.tensor([x[1] for x in dataset])
+    
+    num_classes = torch.max(labels).item() + 1
+    dataset = [(g.remove_self_loop().add_self_loop(), y) for g, y in dataset]
+
+    print(f"******** # Num Graphs: {len(dataset)}, # Num Feat: {feature_dim}, # Num Classes: {num_classes} ********")
+
+    return dataset, (feature_dim, num_classes)
 class MAEExecutor(AbstractExecutor):
     def __init__(self, config, model, data_feature):
+        
         print("enter initialize")
         self.config=config
         self.exp_id = self.config.get('exp_id', None)
@@ -51,12 +143,7 @@ class MAEExecutor(AbstractExecutor):
         print(config['num_heads'])
 
 
-        if config['pooling'] == "mean":
-            self.pooler = AvgPooling()
-        elif config['pooling'] == "max":
-            self.pooler = MaxPooling()
-        elif config['pooling'] == "sum":
-            self.pooler = SumPooling()
+        
         self.evaluator=get_evaluator(config)
         print("next3")
         #self.model=build_model(config)
@@ -70,6 +157,7 @@ class MAEExecutor(AbstractExecutor):
         #self.seeds = config['seeds']
         self.dataset_name = config['dataset']
         self.max_epoch = config['max_epoch']
+        self.evaluate_res_dir = './libgptb/cache/{}/evaluate_cache'.format(self.exp_id)
         self.max_epoch_f =config['max_epoch_f']
         self.num_hidden = config['num_hidden']
         self.num_layers = config['num_layers']
@@ -91,8 +179,8 @@ class MAEExecutor(AbstractExecutor):
         self.pooler = config['pooling']
         self.deg4feat = config['deg4feat']
         self.batch_size = config['batch_size']
-        self.model=build_model(config)
-        self._logger.info(self.model)
+        #self.model=build_model(config)
+        #self._logger.info(self.model)
     def save_model(self, cache_name):
         """
         将当前的模型保存到文件
@@ -146,6 +234,7 @@ class MAEExecutor(AbstractExecutor):
         checkpoint = torch.load(model_path, map_location='cpu')
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        #self.pooler.load_state_dict(check)
         self._logger.info("Loaded model at {}".format(epoch))
 
     def pretrain(self, model, pooler, dataloaders, optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob=True, logger=None):
@@ -156,27 +245,23 @@ class MAEExecutor(AbstractExecutor):
             model.train()
             loss_list = []
             for batch in train_loader:
-                print(epoch)
-                print(len(train_loader))
-                print(batch)
-                print(batch)
-                batch_g = batch
+                batch_g, _ = batch
                 batch_g = batch_g.to(device)
 
-                feat = batch_g.x
+                feat = batch_g.ndata["attr"]
                 model.train()
-                loss, loss_dict = model(feat, batch_g.edge_index)
-        
+                loss, loss_dict = model(batch_g, feat)
+            
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
                 loss_list.append(loss.item())
-                if logger is not None:
+                if self._logger is not None:
                     loss_dict["lr"] = get_current_lr(optimizer)
-                    logger.note(loss_dict, step=epoch)
-            if scheduler is not None:
-                scheduler.step()
+                    #self._logger.info("loss_dict:{} epoch:{}".format(loss_dict,epoch))
+            #if self.scheduler is not None:
+            #    self.scheduler.step()
             epoch_iter.set_description(f"Epoch {epoch} | train_loss: {np.mean(loss_list):.4f}")
 
         return model
@@ -185,30 +270,55 @@ class MAEExecutor(AbstractExecutor):
         model.eval()
         x_list = []
         y_list = []
+        if self.config['pooling'] == "mean":
+            print("find mean")
+            pooler1 = AvgPooling()
+        elif self.config['pooling'] == "max":
+            pooler1 = MaxPooling()
+        elif self.config['pooling'] == "sum":
+            pooler1 = SumPooling()
+        else:
+            raise NotImplementedError
         with torch.no_grad():
-            for i, batch_g in enumerate(dataloader):
+            for i, (batch_g,labels) in enumerate(dataloader):
                 batch_g = batch_g.to(device)
-                feat = batch_g.x
-                labels = batch_g.y.cpu()
-                out = model.embed(feat, batch_g.edge_index)
-                if pooler == "mean":
-                    out = global_mean_pool(out, batch_g.batch)
-                elif pooler == "max":
-                    out = global_max_pool(out, batch_g.batch)
-                elif pooler == "sum":
-                    out = global_add_pool(out, batch_g.batch)
-                else:
-                    raise NotImplementedError
+                feat = batch_g.ndata["attr"]
+                out = model.embed(batch_g, feat)
+                out = pooler1(batch_g, out)
 
                 y_list.append(labels.numpy())
                 x_list.append(out.cpu().numpy())
+
+                #y_list.append(labels.numpy())
+                #x_list.append(out.cpu().numpy())
+        print(x_list)
         x = np.concatenate(x_list, axis=0)
         y = np.concatenate(y_list, axis=0)
         test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
         print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
         return test_f1
 
+    def evaluate_graph_embeddings_using_svm(self,embeddings, labels):
+        result = []
+        kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
 
+        for train_index, test_index in kf.split(embeddings, labels):
+            x_train = embeddings[train_index]
+            x_test = embeddings[test_index]
+            y_train = labels[train_index]
+            y_test = labels[test_index]
+            params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
+            svc = SVC(random_state=42)
+            clf = GridSearchCV(svc, params)
+            clf.fit(x_train, y_train)
+
+            preds = clf.predict(x_test)
+            f1 = f1_score(y_test, preds, average="micro")
+            result.append(f1)
+        test_f1 = np.mean(result)
+        test_std = np.std(result)
+
+        return test_f1, test_std
 
     def evaluate(self, dataloader):
         """
@@ -217,36 +327,25 @@ class MAEExecutor(AbstractExecutor):
         Args:
             test_dataloader(torch.Dataloader): Dataloader
         """
+        acc_list = []
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
             self.load_model_with_epoch(epoch_idx)
-            self.model.encoder_model.eval()
-            x = []
-            y = []
-            for data in dataloader:
-                data = data.to('cuda')
-                if data.x is None:
-                    num_nodes = data.batch.size(0)
-                    data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
-                _, _, g1, g2 = self.model.encoder_model(data.x, data.edge_index, data.batch)
-                x.append(g1 + g2)
-                y.append(data.y)
-            x = torch.cat(x, dim=0)
-            y = torch.cat(y, dim=0)
+            self.model = self.model.to(self.device)
+            self.model.eval()
+            test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
+            acc_list.append(test_f1)
 
-            split = get_split(num_samples=x.size()[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
-            result = SVMEvaluator()(x, y, split)
-            print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
-
-
-            self._logger.info('Evaluate result is ' + json.dumps(result))
-            filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
-                        self.config['model'] + '_' + self.config['dataset']
-            save_path = self.evaluate_res_dir
-            with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
-                json.dump(result, f)
-                self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
+            inal_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
+            self._logger.info('inal_acc is ' + json.dumps(inal_acc))
+            self._logger.info('final_acc_std is ' + json.dumps(final_acc_std))
+            #filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
+            #            self.config['model'] + '_' + self.config['dataset']
+            #save_path = self.evaluate_res_dir
+            #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
+            #    json.dump(result, f)
+            #    self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
     def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
         opt_lower = opt.lower()
 
@@ -285,11 +384,17 @@ class MAEExecutor(AbstractExecutor):
         train_time = []
         eval_time = []
         num_batches = len(train_dataloader)
-        print("num bac")
-        print(len(train_dataloader))
+        graphs, (num_features, num_classes) = load_graph_classification_dataset(self.dataset_name, deg4feat=self.deg4feat)
+
+
+        train_idx = torch.arange(len(graphs))
+        train_sampler = SubsetRandomSampler(train_idx)
+    
+        self.train_loader = GraphDataLoader(graphs, sampler=train_sampler, collate_fn=collate_fn, batch_size=self.config['batch_size'], pin_memory=True)
+        self.eval_loader = GraphDataLoader(graphs, collate_fn=collate_fn, batch_size=self.config['batch_size'], shuffle=False)
         self._logger.info("num_batches:{}".format(num_batches))
         epoch_idx=0
-        for epoch_idx in range(200):
+        for epoch_idx in range(100):
             print(f"####### Running for epoch {epoch_idx}")
             #set_random_seed(seed)
 
@@ -302,10 +407,10 @@ class MAEExecutor(AbstractExecutor):
             self.model.to(self.device)
             optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
 
-        
+            self.optimizer=optimizer
 
             
-            self.model = self.pretrain(self.model, self.pooler, (train_dataloader, eval_dataloader), optimizer, self.max_epoch, self.device, self.scheduler, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
+            self.model = self.pretrain(self.model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, self.scheduler, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
             self.model = self.model.cpu()
             if epoch_idx+1 in [10,20,40,60,80,100]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)
