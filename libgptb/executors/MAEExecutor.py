@@ -261,7 +261,7 @@ class MAEExecutor(AbstractExecutor):
             self.model = self.model.to(self.device)
             self.model.eval()
             #print("num layers {}".format(self.num_layers))
-            test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
+            test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
             acc_list.append(test_f1)
 
             inal_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
@@ -326,16 +326,16 @@ class MAEExecutor(AbstractExecutor):
         self.model.to(self.device)
         optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
         print(optimizer)
-
+        print(self.config["num_classes"])
         self.optimizer=optimizer
 
         
-        self.model = self.pretrain(self.model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, self.scheduler, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
+        self.model = self.pretrain(self.model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, self.scheduler, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
         self.model = self.model.cpu()
         self.model = self.model.to(self.device)
         self.model.eval()
         acc_list = []
-        test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.num_layers, self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
+        test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
         acc_list.append(test_f1)
         final_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
         

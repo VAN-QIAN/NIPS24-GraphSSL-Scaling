@@ -45,26 +45,16 @@ class TUDataset_MAE(AbstractDataset):
         self.test_ratio = self.config.get("test_ratio",0.1)
         #self.dataset=TUDataset(root="./data",name=self.datasetName)
         self.dataset=TUDataset(self.datasetName)
-        #self._load_data()
+        self._load_data()
+        config["num_classes"]=self.num_classes
+        
+        print(config["num_classes"])
         self.split_ratio = self.config.get('ratio', 0.1)
         if self.split_ratio != 0:
             self.split_for_train(self.split_ratio)
             print("split generated")
 
     def _load_data(self):
-        device = torch.device('cuda')
-        path = ""
-        aug=self.config.get("aug","random2")
-        # orignal paper choices of datasets.
-        #if self.datasetName in ['MUTAG', 'PTC_MR', 'IMDB-BINARY', 'IMDB-MULTI', 'REDDIT-BINARY', 'REDDIT-MULTI-5K']:
-        if self.datasetName in ["MUTAG", "MCF-7", "MOLT-4","P388","ZINC_full","reddit_threads","BZR"]:   
-            tu_dataset_aug = getattr(importlib.import_module('libgptb.data.dataset'), 'TUDataset_aug')
-
-        self.dataset = tu_dataset_aug(path, name=self.datasetName, aug=aug).shuffle()
-        self.dataset_eval=tu_dataset_aug(path, name=self.datasetName, aug="none").shuffle()
-
-
-    def get_data(self):
         deg4feat=False
         #dataset1 = TUDataset(self.datasetName)
         graph, _ = self.dataset[0]
@@ -112,10 +102,14 @@ class TUDataset_MAE(AbstractDataset):
     
         num_classes = torch.max(labels).item() + 1
         self.dataset = [(g.remove_self_loop().add_self_loop(), y) for g, y in self.dataset]
-        indices = torch.load("./split/{}.pt".format(self.datasetName))
+        
         print(f"******** # Num Graphs: {len(self.dataset)}, # Num Feat: {feature_dim}, # Num Classes: {num_classes} ********")
         self.num_features=feature_dim
         self.num_classes=num_classes
+
+
+    def get_data(self):
+        indices = torch.load("./split/{}.pt".format(self.datasetName))
         if self.split_ratio==1:
             train_size = int(len(self.dataset) * self.train_ratio)
             # valid_size = int(len(self.dataset) * self.valid_ratio)
