@@ -17,14 +17,11 @@ def get_dataset(config):
     Returns:
         AbstractDataset: the loaded dataset
     """
-    print("error")
-    importlib.import_module('libgptb.data.dataset')
-    print("next")
+
     try:
         return getattr(importlib.import_module('libgptb.data.dataset'),
                        config['dataset_class'])(config)
     except AttributeError:
-        print("Error Attribute")
         try:
             return getattr(importlib.import_module('libgptb.data.dataset.dataset_subclass'),
                            config['dataset_class'])(config)

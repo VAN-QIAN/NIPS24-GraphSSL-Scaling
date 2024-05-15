@@ -23,9 +23,7 @@ def build_model(args):
     alpha_l = args['alpha_l']
     concat_hidden = args['concat_hidden']
     num_features =args['num_feature']['num_features']
-    print(args['num_feature'])
-    print(concat_hidden)
-    print(type(num_hidden))
+
 
     model = PreModel(
         in_dim=int(num_features),

@@ -48,7 +48,6 @@ class TUDataset_MAE(AbstractDataset):
         self._load_data()
         config["num_classes"]=self.num_classes
         
-        print(config["num_classes"])
         self.split_ratio = self.config.get('ratio', 0.1)
         if self.split_ratio != 0:
             self.split_for_train(self.split_ratio)

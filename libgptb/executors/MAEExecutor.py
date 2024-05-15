@@ -255,12 +255,10 @@ class MAEExecutor(AbstractExecutor):
         """
         acc_list = []
         self._logger.info('Start evaluating ...')
-        #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1,110-1,120-1,140-1,160-1,180-1,200-1]:
             self.load_model_with_epoch(epoch_idx)
             self.model = self.model.to(self.device)
             self.model.eval()
-            #print("num layers {}".format(self.num_layers))
             test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
             acc_list.append(test_f1)
 
@@ -314,24 +312,24 @@ class MAEExecutor(AbstractExecutor):
         self.eval_loader=eval_dataloader
         epoch_idx=0
 
-            #set_random_seed(seed)
-
         if self.logs:
             logger = TBLogger(name=f"{self.dataset_name}_loss_{self.loss_fn}_rpr_{self.replace_rate}_nh_{self.num_hidden}_nl_{self.num_layers}_lr_{self.lr}_mp_{self.max_epoch}_mpf_{self.max_epoch_f}_wd_{self.weight_decay}_wdf_{self.weight_decay_f}_{self.encoder_type}_{self.decoder_type}")
         else:
             logger = None
 
         self.model = build_model(self.config)
-        print(self.model)
+        #print(self.model)
         self.model.to(self.device)
         optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
-        print(optimizer)
-        print(self.config["num_classes"])
+        #print(optimizer)
+        #print(self.config["num_classes"])
         self.optimizer=optimizer
 
         
         self.model = self.pretrain(self.model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, self.scheduler, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
         self.model = self.model.cpu()
+        """
+        这部分是用来检测模型是否准确
         self.model = self.model.to(self.device)
         self.model.eval()
         acc_list = []
@@ -340,7 +338,7 @@ class MAEExecutor(AbstractExecutor):
         final_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
         
         print(f"# final_acc: {final_acc:.4f}±{final_acc_std:.4f}")    
-        
+        """
     
         return
 

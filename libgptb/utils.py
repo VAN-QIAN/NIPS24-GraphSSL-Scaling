@@ -26,11 +26,7 @@ def get_executor(config, model, data_feature):
     module = importlib.import_module(module_name)
 
     #       List all elements in the module
-    print(dir(module))
-    print(config['executor'])
-    print("enter")
-    #importlib.import_module("")
-    print("leave")
+
     # getattr(importlib.import_module('libgptb.executors'),
     #                     config['executor'])(config, model, data_feature)
     try:
@@ -57,8 +53,6 @@ def get_model(config, data_feature):
     module = importlib.import_module(module_name)
 
     #       List all elements in the module
-    print(dir(module))
-    print(config['model'])
     if config['task'] == 'GCL' or config['task'] == 'SSGCL' or config['task'] == 'SGC':
         try:
             return getattr(importlib.import_module('libgptb.model'),
