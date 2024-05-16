@@ -105,7 +105,7 @@ class MAEExecutor(AbstractExecutor):
         self.pooler = config['pooling']
         self.deg4feat = config['deg4feat']
         self.batch_size = config['batch_size']
-        self.model=build_model(config)
+        self.model=model
         #print(self.model)
     def save_model(self, cache_name):
         """
@@ -317,7 +317,7 @@ class MAEExecutor(AbstractExecutor):
         else:
             logger = None
 
-        self.model = build_model(self.config)
+        #self.model = build_model(self.config)
         #print(self.model)
         self.model.to(self.device)
         optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
