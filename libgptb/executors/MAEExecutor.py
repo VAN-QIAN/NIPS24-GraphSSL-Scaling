@@ -177,6 +177,9 @@ class MAEExecutor(AbstractExecutor):
 
                 feat = batch_g.ndata["attr"]
                 model.train()
+                print(batch_g.ndata["node_labels"])
+                print(feat)
+                print("---------------------------")
                 loss, loss_dict = model(batch_g, feat)
             
                 optimizer.zero_grad()

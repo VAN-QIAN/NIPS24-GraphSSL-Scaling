@@ -225,6 +225,8 @@ class PreModel(nn.Module):
         return use_g, out_x, (mask_nodes, keep_nodes)
 
     def forward(self, g, x):
+        #print("g: -------------------- {}".format(g))
+        #print("x: @@@@@@@@@@@@@@@@@@@ {}".format(x))
         # ---- attribute reconstruction ----
         loss = self.mask_attr_prediction(g, x)
         loss_item = {"loss": loss.item()}

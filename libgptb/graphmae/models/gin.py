@@ -131,7 +131,7 @@ class GINConv(nn.Module):
 
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
+            
             graph.update_all(aggregate_fn, self._reducer('m', 'neigh'))
             rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
             if self.apply_func is not None:

@@ -156,7 +156,7 @@ class GINConv(nn.Module):
         
         with graph.local_scope():
             aggregate_fn = fn.copy_u('h', 'm')
-
+            print(graph)
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src
