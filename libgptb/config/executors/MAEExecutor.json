@@ -1,7 +1,7 @@
 {
   "gpu": true,
   "gpu_id": 3,
-  "max_epoch": 200,
+  "max_epoch": 20,
   "train_loss": "none",
   "epoch": 0,
   "learner": "adam",

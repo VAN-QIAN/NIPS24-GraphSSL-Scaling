@@ -1,12 +1,6 @@
 import os
 import dgl
-from dgl.data import (
-    load_data, 
-    TUDataset, 
-    CoraGraphDataset, 
-    CiteseerGraphDataset, 
-    PubmedGraphDataset
-)
+
 from torch.utils.data.sampler import SubsetRandomSampler
 from dgl.dataloading import GraphDataLoader
 import torch.nn.functional as F
@@ -15,6 +9,7 @@ import json
 import numpy as np
 import datetime
 import torch
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from logging import getLogger
 from sklearn.svm import SVC
@@ -49,34 +44,15 @@ from libgptb.evaluators import get_split, LREvaluator
 from functools import partial
 from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
 from logging import getLogger
-def evaluate_graph_embeddings_using_svm(embeddings, labels):
-    result = []
-    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
 
-    for train_index, test_index in kf.split(embeddings, labels):
-        
-        x_train = embeddings[train_index]
-        x_test = embeddings[test_index]
-        y_train = labels[train_index]
-        y_test = labels[test_index]
-        params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
-        svc = SVC(random_state=42)
-        clf = GridSearchCV(svc, params)
-        clf.fit(x_train, y_train)
-
-        preds = clf.predict(x_test)
-        f1 = f1_score(y_test, preds, average="micro")
-        result.append(f1)
-    test_f1 = np.mean(result)
-    test_std = np.std(result)
-
-    return test_f1, test_std
 
 class MAEExecutor(AbstractExecutor):
     def __init__(self, config, model, data_feature):
+        
         self.config=config
         self.exp_id = self.config.get('exp_id', None)
         self.cache_dir = './libgptb/cache/{}/model_cache'.format(self.exp_id)
+        self.summary_writer_dir = './libgptb/cache/{}/'.format(self.exp_id)
         self.config=config
         self._logger = getLogger()
         self.evaluator=get_evaluator(config)
@@ -106,7 +82,51 @@ class MAEExecutor(AbstractExecutor):
         self.deg4feat = config['deg4feat']
         self.batch_size = config['batch_size']
         self.model=model
+        self.downstream_task=config.get("downstream_task","original")
+        self.downstream_ratio=self.config.get("downstream_ratio",0.1)
+        self.load_best_epoch = self.config.get('load_best_epoch', False)
+        self.patience = self.config.get('patience', 50)
+        self.saved = self.config.get('saved_model', True)
+        self.log_every = self.config.get('log_every', 1)
+        self._writer = SummaryWriter(self.summary_writer_dir)
+        self.lr_decay = self.config.get('lr_decay', True)
+        self.lr_decay_ratio = self.config.get('lr_decay_ratio', 0.1)
+        self.lr_scheduler_type = self.config.get('lr_scheduler', 'multisteplr')
+        self.lr_scheduler = self._build_lr_scheduler()
+        self.use_early_stop = self.config.get('use_early_stop', False)
         #print(self.model)
+    def _build_lr_scheduler(self):
+        """
+        根据全局参数`lr_scheduler`选择对应的lr_scheduler
+        """
+        if self.lr_decay:
+            self._logger.info('You select `{}` lr_scheduler.'.format(self.lr_scheduler_type.lower()))
+            if self.lr_scheduler_type.lower() == 'multisteplr':
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    self.optimizer, milestones=self.milestones, gamma=self.lr_decay_ratio)
+            elif self.lr_scheduler_type.lower() == 'steplr':
+                lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                    self.optimizer, step_size=self.step_size, gamma=self.lr_decay_ratio)
+            elif self.lr_scheduler_type.lower() == 'exponentiallr':
+                lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(
+                    self.optimizer, gamma=self.lr_decay_ratio)
+            elif self.lr_scheduler_type.lower() == 'cosineannealinglr':
+                lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    self.optimizer, T_max=self.lr_T_max, eta_min=self.lr_eta_min)
+            elif self.lr_scheduler_type.lower() == 'lambdalr':
+                lr_scheduler = torch.optim.lr_scheduler.LambdaLR(
+                    self.optimizer, lr_lambda=self.lr_lambda)
+            elif self.lr_scheduler_type.lower() == 'reducelronplateau':
+                lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    self.optimizer, mode='min', patience=self.lr_patience,
+                    factor=self.lr_decay_ratio, threshold=self.lr_threshold)
+            else:
+                self._logger.warning('Received unrecognized lr_scheduler, '
+                                     'please check the parameter `lr_scheduler`.')
+                lr_scheduler = None
+        else:
+            lr_scheduler = None
+        return lr_scheduler
     def save_model(self, cache_name):
         """
         将当前的模型保存到文件
@@ -163,69 +183,9 @@ class MAEExecutor(AbstractExecutor):
         #self.pooler.load_state_dict(check)
         self._logger.info("Loaded model at {}".format(epoch))
 
-    def pretrain(self, model, pooler, dataloaders, optimizer, max_epoch, device, scheduler, num_classes, lr_f, weight_decay_f, max_epoch_f, linear_prob=True, logger=None):
-        train_loader, eval_loader = dataloaders
-        set_random_seed(0)
-        epoch_iter = tqdm(range(max_epoch))
-        for epoch in epoch_iter:
-            #print(f"####### Running for epoch {epoch}")
-            model.train()
-            loss_list = []
-            for batch in train_loader:
-                batch_g, _ = batch
-                batch_g = batch_g.to(device)
 
-                feat = batch_g.ndata["attr"]
-                model.train()
-                print(batch_g.ndata["node_labels"])
-                print(feat)
-                print("---------------------------")
-                loss, loss_dict = model(batch_g, feat)
-            
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
 
-                loss_list.append(loss.item())
-                if self._logger is not None:
-                    loss_dict["lr"] = get_current_lr(optimizer)
-                    #self._logger.info("loss_dict:{} epoch:{}".format(loss_dict,epoch))
-            #if self.scheduler is not None:
-            #    self.scheduler.step()
-            if epoch+1 in [10,20,40,60,80,100,110,120,140,160,180,200]:
-                model_file_name = self.save_model_with_epoch(epoch)
-                self._logger.info('saving to {}'.format(model_file_name))
-            epoch_iter.set_description(f"Epoch {epoch} | train_loss: {np.mean(loss_list):.4f}")
-
-        return model
-
-    def graph_classification_evaluation(self,model, pooler, dataloader, num_classes, lr_f, weight_decay_f, max_epoch_f, device, mute=False):
-        model.eval()
-        x_list = []
-        y_list = []
-        if self.config['pooling'] == "mean":
-            pooler1 = AvgPooling()
-        elif self.config['pooling'] == "max":
-            pooler1 = MaxPooling()
-        elif self.config['pooling'] == "sum":
-            pooler1 = SumPooling()
-        else:
-            raise NotImplementedError
-        with torch.no_grad():
-            for i, (batch_g,labels) in enumerate(dataloader):
-                batch_g = batch_g.to(device)
-                feat = batch_g.ndata["attr"]
-                out = model.embed(batch_g, feat)
-                out = pooler1(batch_g, out)
-
-                y_list.append(labels.numpy())
-                x_list.append(out.cpu().numpy())
-
-        x = np.concatenate(x_list, axis=0)
-        y = np.concatenate(y_list, axis=0)
-        test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
-        print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
-        return test_f1
+  
 
     def evaluate_graph_embeddings_using_svm(self,embeddings, labels):
         result = []
@@ -249,31 +209,51 @@ class MAEExecutor(AbstractExecutor):
 
         return test_f1, test_std
 
-    def evaluate(self, dataloader):
+    def evaluate(self, test_dataloader):
         """
         use model to test data
 
         Args:
             test_dataloader(torch.Dataloader): Dataloader
         """
-        acc_list = []
         self._logger.info('Start evaluating ...')
-        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1,110-1,120-1,140-1,160-1,180-1,200-1]:
-            self.load_model_with_epoch(epoch_idx)
-            self.model = self.model.to(self.device)
-            self.model.eval()
-            test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
-            acc_list.append(test_f1)
+        #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
+        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+                if epoch_idx+1 > self.max_epoch:
+                    break
+                self.model.eval()
+                x_list = []
+                y_list = []
+                if self.config['pooling'] == "mean":
+                    pooler1 = AvgPooling()
+                elif self.config['pooling'] == "max":
+                    pooler1 = MaxPooling()
+                elif self.config['pooling'] == "sum":
+                    pooler1 = SumPooling()
+                else:
+                    raise NotImplementedError
+                with torch.no_grad():
+                    for i, (batch_g,labels) in enumerate(test_dataloader):
+                        batch_g = batch_g.to(self.device)
+                        feat = batch_g.ndata["attr"]
+                        out = self.model.embed(batch_g, feat)
+                        out = pooler1(batch_g, out)
 
-            inal_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
-            self._logger.info('inal_acc is ' + json.dumps(inal_acc))
-            self._logger.info('final_acc_std is ' + json.dumps(final_acc_std))
-            #filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
-            #            self.config['model'] + '_' + self.config['dataset']
-            #save_path = self.evaluate_res_dir
-            #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
-            #    json.dump(result, f)
-            #    self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
+                        y_list.append(labels.numpy())
+                        x_list.append(out.cpu().numpy())
+
+                x = np.concatenate(x_list, axis=0)
+                y = np.concatenate(y_list, axis=0)
+                test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
+                print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
+                    
+                self._logger.info('Evaluate result is ' + json.dumps(test_f1))
+                filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
+                            self.config['model'] + '_' + self.config['dataset']
+                save_path = self.evaluate_res_dir
+                #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
+                #    json.dump(result, f)
+                self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
     def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
         opt_lower = opt.lower()
 
@@ -307,42 +287,92 @@ class MAEExecutor(AbstractExecutor):
         """
         self._logger.info('Start training ...')
         min_val_loss = float('inf')
-        num_batches = len(train_dataloader)
-        set_random_seed(0)
-        
-        self._logger.info("num_batches:{}".format(num_batches))
-        self.train_loader=train_dataloader
-        self.eval_loader=eval_dataloader
-        epoch_idx=0
-
-        if self.logs:
-            logger = TBLogger(name=f"{self.dataset_name}_loss_{self.loss_fn}_rpr_{self.replace_rate}_nh_{self.num_hidden}_nl_{self.num_layers}_lr_{self.lr}_mp_{self.max_epoch}_mpf_{self.max_epoch_f}_wd_{self.weight_decay}_wdf_{self.weight_decay_f}_{self.encoder_type}_{self.decoder_type}")
-        else:
-            logger = None
-
-        #self.model = build_model(self.config)
-        #print(self.model)
         self.model.to(self.device)
         optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
         #print(optimizer)
         #print(self.config["num_classes"])
         self.optimizer=optimizer
+        wait = 0
+        best_epoch = 0
+        train_time = []
+        eval_time = []
+        num_batches = len(train_dataloader)
+        self._logger.info("num_batches:{}".format(num_batches))
+        epoch_iter = tqdm(range(self.max_epoch))
+        for epoch_idx in epoch_iter:
+            start_time = time.time()
+            losses = self._train_epoch(train_dataloader, epoch_idx)
+            t1 = time.time()
+            train_time.append(t1 - start_time)
+            self._writer.add_scalar('training loss', np.mean(losses), epoch_idx)
+            self._logger.info("epoch complete!")
 
-        
-        self.model = self.pretrain(self.model, self.pooler, (self.train_loader, self.eval_loader), optimizer, self.max_epoch, self.device, self.scheduler, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.linear_prob,  self._logger)
-        self.model = self.model.cpu()
-        """
-        这部分是用来检测模型是否准确
-        self.model = self.model.to(self.device)
-        self.model.eval()
-        acc_list = []
-        test_f1 = self.graph_classification_evaluation(self.model, self.pooler, self.train_loader, self.config["num_classes"], self.lr_f, self.weight_decay_f, self.max_epoch_f, self.device, mute=False)
-        acc_list.append(test_f1)
-        final_acc, final_acc_std = np.mean(acc_list), np.std(acc_list)
-        
-        print(f"# final_acc: {final_acc:.4f}±{final_acc_std:.4f}")    
-        """
-    
-        return
+            self._logger.info("evaluating now!")
+            t2 = time.time()
+            val_loss = np.mean(losses) 
+            end_time = time.time()
+            eval_time.append(end_time - t2)
 
-    
+            if self.lr_scheduler is not None:
+                if self.lr_scheduler_type.lower() == 'reducelronplateau':
+                    self.lr_scheduler.step(val_loss)
+                else:
+                    self.lr_scheduler.step()
+
+            if (epoch_idx % self.log_every) == 0:
+                log_lr = self.optimizer.param_groups[0]['lr']
+                message = 'Epoch [{}/{}] train_loss: {:.4f}, lr: {:.6f}, {:.2f}s'.\
+                    format(epoch_idx, self.max_epoch, np.mean(losses),  log_lr, (end_time - start_time))
+                self._logger.info(message)
+
+            #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
+            if epoch_idx+1 in [10,20,40,60,80,100]:
+                model_file_name = self.save_model_with_epoch(epoch_idx)
+                self._logger.info('saving to {}'.format(model_file_name))
+
+            if val_loss < min_val_loss:
+                wait = 0
+                if self.saved:
+                    model_file_name = self.save_model_with_epoch(epoch_idx)
+                    self._logger.info('Val loss decrease from {:.4f} to {:.4f}, '
+                                      'saving to {}'.format(min_val_loss, val_loss, model_file_name))
+                min_val_loss = val_loss
+                best_epoch = epoch_idx
+            else:
+                wait += 1
+                if wait == self.patience and self.use_early_stop:
+                    self._logger.warning('Early stopping at epoch: %d' % epoch_idx)
+                    break
+        if len(train_time) > 0:
+            self._logger.info('Trained totally {} epochs, average train time is {:.3f}s, '
+                              'average eval time is {:.3f}s'.
+                              format(len(train_time), sum(train_time) / len(train_time),
+                                     sum(eval_time) / len(eval_time)))
+        if self.load_best_epoch:
+            self.load_model_with_epoch(best_epoch)
+        return min_val_loss
+
+    def _train_epoch(self, train_dataloader,epoch_idx,loss_func=None,train=True):
+        loss_all = 0
+        num_graph=len(train_dataloader)
+        
+        if train:
+            self.model.train()
+        else:
+            self.model.eval()
+        for batch in train_dataloader:
+            #print(batch)
+            batch_g, _ = batch
+            batch_g = batch_g.to(self.device)
+
+            feat = batch_g.ndata["attr"]
+            self.model.train()
+            loss, loss_dict = self.model(batch_g, feat)
+            #print(batch_g)
+            self.optimizer.zero_grad()
+            loss_all += loss.item()
+            if train:
+                loss.backward()
+                self.optimizer.step()
+            
+        return loss_all /len(train_dataloader)

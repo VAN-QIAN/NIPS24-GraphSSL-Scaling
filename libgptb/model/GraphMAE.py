@@ -23,7 +23,26 @@ import torch.nn as nn
 
 from libgptb.graphmae.utils import create_norm, drop_edge
 from libgptb.graphmae.utils import create_activation, NormLayer, create_norm
+def dgl_to_pyg(dgl_graph):
+    """Convert DGLGraph to PyG Data object"""
+    node_features = dgl_graph.ndata['attr'] if 'attr' in dgl_graph.ndata else None
+    
+    # Extract edge indices
+    src, dst = dgl_graph.edges()
+    edge_index = torch.stack([src, dst], dim=0)
 
+    # Extract edge features if they exist
+    edge_features = dgl_graph.edata['attr'] if 'attr' in dgl_graph.edata else None
+
+    # Create PyG Data object
+    data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_features)
+
+    # If the graph has labels
+    if 'label' in dgl_graph.ndata:
+        data.y = dgl_graph.ndata['label']
+
+    return data
+    return data
 def sce_loss(x, y, alpha=3):
     x = F.normalize(x, p=2, dim=-1)
     y = F.normalize(y, p=2, dim=-1)
@@ -106,7 +125,17 @@ class GIN(nn.Module):
             return self.head(h), hidden_list
         else:
             return self.head(h)
-
+    def get_embeddings(self, loader):
+        self.eval()  # Set the model to evaluation mode
+        embeddings = []
+        with torch.no_grad():  # Disable gradient calculation
+            for dgl_graph in loader:
+                #pyg_data = dgl_to_pyg(dgl_graph)  # Convert DGLGraph to PyG Data
+                
+                x, edge_index = pyg_data.x, pyg_data.edge_index
+                emb = self.forward(x, edge_index)  # Get the embeddings
+                embeddings.append(emb)
+        return torch.cat(embeddings, dim=0)
     def reset_classifier(self, num_classes):
         self.head = nn.Linear(self.out_dim, num_classes)
 
@@ -156,7 +185,7 @@ class GINConv(nn.Module):
         
         with graph.local_scope():
             aggregate_fn = fn.copy_u('h', 'm')
-            print(graph)
+            
 
             feat_src, feat_dst = expand_as_pair(feat, graph)
             graph.srcdata['h'] = feat_src

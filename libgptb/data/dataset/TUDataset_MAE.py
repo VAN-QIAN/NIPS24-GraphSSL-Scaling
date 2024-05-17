@@ -8,6 +8,7 @@ from logging import getLogger
 import torch_geometric.transforms as T
 from collections import namedtuple, Counter
 from torch.utils.data.sampler import SubsetRandomSampler
+from libgptb.data.dataset import DGLDataset
 #from torch_geometric.datasets import TUDataset
 import dgl
 import torch.nn.functional as F
@@ -23,7 +24,7 @@ from libgptb.data.dataset.abstract_dataset import AbstractDataset
 import importlib
 from torch_geometric.loader import DataLoader
 from dgl.dataloading import GraphDataLoader
-
+#from libgptb.data.
 from copy import deepcopy
 import pdb
 def collate_fn(batch):
@@ -62,14 +63,20 @@ class TUDataset_MAE(AbstractDataset):
             if "node_labels" in graph.ndata and not deg4feat:
                 print("Use node label as node features")
                 feature_dim = 0
+                edge_dim=0
                 for g, _ in self.dataset:
                     feature_dim = max(feature_dim, g.ndata["node_labels"].max().item())
+                    edge_dim = max(edge_dim, g.edata["edge_labels"].max().item())
             
                 feature_dim += 1
+                edge_dim+=1
                 for g, l in self.dataset:
                     node_label = g.ndata["node_labels"].view(-1)
                     feat = F.one_hot(node_label, num_classes=feature_dim).float()
                     g.ndata["attr"] = feat
+                    edge_label = g.edata["edge_labels"].view(-1)
+                    feat = F.one_hot(edge_label, num_classes=edge_dim).float()
+                    g.edata["attr"] = feat
             else:
                 print("Using degree as node features")
                 feature_dim = 0
