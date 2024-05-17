@@ -1,8 +1,8 @@
 import os
-import dgl
+
 
 from torch.utils.data.sampler import SubsetRandomSampler
-from dgl.dataloading import GraphDataLoader
+
 import torch.nn.functional as F
 import time
 import json
@@ -25,7 +25,6 @@ from libgptb.evaluators import get_split, SVMEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score
-from dgl.nn.pytorch.glob import SumPooling, AvgPooling, MaxPooling
 from libgptb.graphmae.utils import (
     build_args,
     create_optimizer,
@@ -219,41 +218,41 @@ class MAEExecutor(AbstractExecutor):
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
-                if epoch_idx+1 > self.max_epoch:
-                    break
-                self.model.eval()
-                x_list = []
-                y_list = []
-                if self.config['pooling'] == "mean":
-                    pooler1 = AvgPooling()
-                elif self.config['pooling'] == "max":
-                    pooler1 = MaxPooling()
-                elif self.config['pooling'] == "sum":
-                    pooler1 = SumPooling()
-                else:
-                    raise NotImplementedError
-                with torch.no_grad():
-                    for i, (batch_g,labels) in enumerate(test_dataloader):
-                        batch_g = batch_g.to(self.device)
-                        feat = batch_g.ndata["attr"]
-                        out = self.model.embed(batch_g, feat)
-                        out = pooler1(batch_g, out)
+            if epoch_idx+1 > self.max_epoch:
+                break
+            self.model.eval()
+            x_list = []
+            y_list = []
+            with torch.no_grad():
+                for i, batch_g in enumerate(test_dataloader):
+                    batch_g = batch_g.to(self.device)
+                    feat = batch_g.x
+                    labels = batch_g.y.cpu()
+                    out = self.model.embed(feat, batch_g.edge_index)
+                    if self.pooler == "mean":
+                        out = global_mean_pool(out, batch_g.batch)
+                    elif self.pooler == "max":
+                        out = global_max_pool(out, batch_g.batch)
+                    elif self.pooler == "sum":
+                        out = global_add_pool(out, batch_g.batch)
+                    else:
+                        raise NotImplementedError
 
-                        y_list.append(labels.numpy())
-                        x_list.append(out.cpu().numpy())
+                    y_list.append(labels.numpy())
+                    x_list.append(out.cpu().numpy())
+            x = np.concatenate(x_list, axis=0)
+            y = np.concatenate(y_list, axis=0)
+            test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
+            print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
 
-                x = np.concatenate(x_list, axis=0)
-                y = np.concatenate(y_list, axis=0)
-                test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
-                print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
                     
-                self._logger.info('Evaluate result is ' + json.dumps(test_f1))
-                filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
+            self._logger.info('Evaluate result is ' + json.dumps(test_f1))
+            filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
                             self.config['model'] + '_' + self.config['dataset']
-                save_path = self.evaluate_res_dir
+            save_path = self.evaluate_res_dir
                 #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
                 #    json.dump(result, f)
-                self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
+            self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
     def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
         opt_lower = opt.lower()
 
@@ -362,17 +361,17 @@ class MAEExecutor(AbstractExecutor):
             self.model.eval()
         for batch in train_dataloader:
             #print(batch)
-            batch_g, _ = batch
+            batch_g = batch
             batch_g = batch_g.to(self.device)
 
-            feat = batch_g.ndata["attr"]
+            feat = batch_g.x
             self.model.train()
-            loss, loss_dict = self.model(batch_g, feat)
-            #print(batch_g)
+            loss, loss_dict = self.model(feat, batch_g.edge_index)
+            
             self.optimizer.zero_grad()
-            loss_all += loss.item()
+            loss_all+=loss.item()
             if train:
                 loss.backward()
                 self.optimizer.step()
-            
+          
         return loss_all /len(train_dataloader)

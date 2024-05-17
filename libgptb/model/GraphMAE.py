@@ -1,17 +1,3 @@
-import os
-import json
-import datetime
-import pandas as pd
-from libgptb.utils import ensure_dir
-from logging import getLogger
-from libgptb.evaluator.abstract_evaluator import AbstractEvaluator
-import torch.nn as nn
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from functools import partial
-import dgl.function as fn
-from dgl.utils import expand_as_pair
 from typing import Optional
 from itertools import chain
 from functools import partial
@@ -20,29 +6,15 @@ import torch
 import torch.nn as nn
 
 
+#from .loss_func import sce_loss
+#from graphmae.utils import create_norm
+from torch_geometric.utils import dropout_edge
+from torch_geometric.utils import add_self_loops, remove_self_loops
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-from libgptb.graphmae.utils import create_norm, drop_edge
-from libgptb.graphmae.utils import create_activation, NormLayer, create_norm
-def dgl_to_pyg(dgl_graph):
-    """Convert DGLGraph to PyG Data object"""
-    node_features = dgl_graph.ndata['attr'] if 'attr' in dgl_graph.ndata else None
-    
-    # Extract edge indices
-    src, dst = dgl_graph.edges()
-    edge_index = torch.stack([src, dst], dim=0)
-
-    # Extract edge features if they exist
-    edge_features = dgl_graph.edata['attr'] if 'attr' in dgl_graph.edata else None
-
-    # Create PyG Data object
-    data = Data(x=node_features, edge_index=edge_index, edge_attr=edge_features)
-
-    # If the graph has labels
-    if 'label' in dgl_graph.ndata:
-        data.y = dgl_graph.ndata['label']
-
-    return data
-    return data
+from torch_geometric.nn import GINConv, MLP
 def sce_loss(x, y, alpha=3):
     x = F.normalize(x, p=2, dim=-1)
     y = F.normalize(y, p=2, dim=-1)
@@ -54,6 +26,69 @@ def sce_loss(x, y, alpha=3):
 
     loss = loss.mean()
     return loss
+class NormLayer(nn.Module):
+    def __init__(self, hidden_dim, norm_type):
+        super().__init__()
+        if norm_type == "batchnorm":
+            self.norm = nn.BatchNorm1d(hidden_dim)
+        elif norm_type == "layernorm":
+            self.norm = nn.LayerNorm(hidden_dim)
+        elif norm_type == "graphnorm":
+            self.norm = norm_type
+            self.weight = nn.Parameter(torch.ones(hidden_dim))
+            self.bias = nn.Parameter(torch.zeros(hidden_dim))
+
+            self.mean_scale = nn.Parameter(torch.ones(hidden_dim))
+        else:
+            raise NotImplementedError
+        
+    def forward(self, graph, x):
+        tensor = x
+        if self.norm is not None and type(self.norm) != str:
+            return self.norm(tensor)
+        elif self.norm is None:
+            return tensor
+
+        batch_list = graph.batch_num_nodes
+        batch_size = len(batch_list)
+        batch_list = torch.Tensor(batch_list).long().to(tensor.device)
+        batch_index = torch.arange(batch_size).to(tensor.device).repeat_interleave(batch_list)
+        batch_index = batch_index.view((-1,) + (1,) * (tensor.dim() - 1)).expand_as(tensor)
+        mean = torch.zeros(batch_size, *tensor.shape[1:]).to(tensor.device)
+        mean = mean.scatter_add_(0, batch_index, tensor)
+        mean = (mean.T / batch_list).T
+        mean = mean.repeat_interleave(batch_list, dim=0)
+
+        sub = tensor - mean * self.mean_scale
+
+        std = torch.zeros(batch_size, *tensor.shape[1:]).to(tensor.device)
+        std = std.scatter_add_(0, batch_index, sub.pow(2))
+        std = ((std.T / batch_list).T + 1e-6).sqrt()
+        std = std.repeat_interleave(batch_list, dim=0)
+        return self.weight * sub / std + self.bias
+def create_norm(name):
+    if name == "layernorm":
+        return nn.LayerNorm
+    elif name == "batchnorm":
+        return nn.BatchNorm1d
+    elif name == "graphnorm":
+        return partial(NormLayer, norm_type="groupnorm")
+    else:
+        return nn.Identity
+
+def create_activation(name):
+    if name == "relu":
+        return nn.ReLU()
+    elif name == "gelu":
+        return nn.GELU()
+    elif name == "prelu":
+        return nn.PReLU()
+    elif name is None:
+        return nn.Identity()
+    elif name == "elu":
+        return nn.ELU()
+    else:
+        raise NotImplementedError(f"{name} is not implemented.")
 class GIN(nn.Module):
     def __init__(self,
                  in_dim,
@@ -83,121 +118,44 @@ class GIN(nn.Module):
             apply_func = MLP(2, in_dim, num_hidden, out_dim, activation=activation, norm=norm)
             if last_norm:
                 apply_func = ApplyNodeFunc(apply_func, norm=norm, activation=activation)
-            self.layers.append(GINConv(in_dim, out_dim, apply_func, init_eps=0, learn_eps=learn_eps, residual=last_residual))
+            self.layers.append(GINConv(nn=apply_func, train_eps=False))
         else:
             # input projection (no residual)
             self.layers.append(GINConv(
-                in_dim, 
-                num_hidden, 
-                ApplyNodeFunc(MLP(2, in_dim, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
-                init_eps=0,
-                learn_eps=learn_eps,
-                residual=residual)
+                nn=ApplyNodeFunc(MLP(2, in_dim, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
+                train_eps=False)
                 )
             # hidden layers
             for l in range(1, num_layers - 1):
                 # due to multi-head, the in_dim = num_hidden * num_heads
                 self.layers.append(GINConv(
-                    num_hidden, num_hidden, 
-                    ApplyNodeFunc(MLP(2, num_hidden, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
-                    init_eps=0,
-                    learn_eps=learn_eps,
-                    residual=residual)
+                    nn=ApplyNodeFunc(MLP(2, num_hidden, num_hidden, num_hidden, activation=activation, norm=norm), activation=activation, norm=norm), 
+                    train_eps=False)
                 )
             # output projection
             apply_func = MLP(2, num_hidden, num_hidden, out_dim, activation=activation, norm=norm)
             if last_norm:
                 apply_func = ApplyNodeFunc(apply_func, activation=activation, norm=norm)
 
-            self.layers.append(GINConv(num_hidden, out_dim, apply_func, init_eps=0, learn_eps=learn_eps, residual=last_residual))
+            self.layers.append(GINConv(nn=apply_func, train_eps=False))
 
         self.head = nn.Identity()
 
-    def forward(self, g, inputs, return_hidden=False):
+    def forward(self, inputs, edge_index, return_hidden=False):
         h = inputs
         hidden_list = []
         for l in range(self.num_layers):
             h = F.dropout(h, p=self.dropout, training=self.training)
-            h = self.layers[l](g, h)
+            h = self.layers[l](h, edge_index)
             hidden_list.append(h)
         # output projection
         if return_hidden:
             return self.head(h), hidden_list
         else:
             return self.head(h)
-    def get_embeddings(self, loader):
-        self.eval()  # Set the model to evaluation mode
-        embeddings = []
-        with torch.no_grad():  # Disable gradient calculation
-            for dgl_graph in loader:
-                #pyg_data = dgl_to_pyg(dgl_graph)  # Convert DGLGraph to PyG Data
-                
-                x, edge_index = pyg_data.x, pyg_data.edge_index
-                emb = self.forward(x, edge_index)  # Get the embeddings
-                embeddings.append(emb)
-        return torch.cat(embeddings, dim=0)
+
     def reset_classifier(self, num_classes):
         self.head = nn.Linear(self.out_dim, num_classes)
-
-
-class GINConv(nn.Module):
-    def __init__(self,
-                 in_dim,
-                 out_dim,
-                 apply_func,
-                 aggregator_type="sum",
-                 init_eps=0,
-                 learn_eps=False,
-                 residual=False,
-                 ):
-        super().__init__()
-        self._in_feats = in_dim
-        self._out_feats = out_dim
-        self.apply_func = apply_func
-
-        self._aggregator_type = aggregator_type
-        if aggregator_type == 'sum':
-            self._reducer = fn.sum
-        elif aggregator_type == 'max':
-            self._reducer = fn.max
-        elif aggregator_type == 'mean':
-            self._reducer = fn.mean
-        else:
-            raise KeyError('Aggregator type {} not recognized.'.format(aggregator_type))
-            
-        if learn_eps:
-            self.eps = torch.nn.Parameter(torch.FloatTensor([init_eps]))
-        else:
-            self.register_buffer('eps', torch.FloatTensor([init_eps]))
-
-        if residual:
-            if self._in_feats != self._out_feats:
-                self.res_fc = nn.Linear(
-                    self._in_feats, self._out_feats, bias=False)
-                print("! Linear Residual !")
-            else:
-                print("Identity Residual ")
-                self.res_fc = nn.Identity()
-        else:
-            self.register_buffer('res_fc', None)
-
-    def forward(self, graph, feat):
-        
-        with graph.local_scope():
-            aggregate_fn = fn.copy_u('h', 'm')
-            
-
-            feat_src, feat_dst = expand_as_pair(feat, graph)
-            graph.srcdata['h'] = feat_src
-            graph.update_all(aggregate_fn, self._reducer('m', 'neigh'))
-            rst = (1 + self.eps) * feat_dst + graph.dstdata['neigh']
-            if self.apply_func is not None:
-                rst = self.apply_func(rst)
-
-            if self.res_fc is not None:
-                rst = rst + self.res_fc(feat_dst)
-
-            return rst
 
 
 class ApplyNodeFunc(nn.Module):
@@ -259,6 +217,7 @@ class MLP(nn.Module):
                 h = self.norms[i](self.linears[i](h))
                 h = self.activations[i](h)
             return self.linears[-1](h)
+
 def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropout, activation, residual, norm, nhead, nhead_out, attn_drop, negative_slope=0.2, concat_out=True) -> nn.Module:
     if m_type == "gat":
         mod = GAT(
@@ -277,45 +236,17 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
             norm=create_norm(norm),
             encoding=(enc_dec == "encoding"),
         )
-    elif m_type == "dotgat":
-        mod = DotGAT(
-            in_dim=in_dim,
-            num_hidden=num_hidden,
-            out_dim=out_dim,
-            num_layers=num_layers,
-            nhead=nhead,
-            nhead_out=nhead_out,
-            concat_out=concat_out,
-            activation=activation,
-            feat_drop=dropout,
-            attn_drop=attn_drop,
-            residual=residual,
-            norm=create_norm(norm),
-            encoding=(enc_dec == "encoding"),
-        )
     elif m_type == "gin":
         mod = GIN(
-            in_dim=in_dim,
-            num_hidden=num_hidden,
-            out_dim=out_dim,
+            in_dim=int(in_dim),
+            num_hidden=int(num_hidden),
+            out_dim=int(out_dim),
             num_layers=num_layers,
             dropout=dropout,
             activation=activation,
             residual=residual,
             norm=norm,
             encoding=(enc_dec == "encoding"),
-        )
-    elif m_type == "gcn":
-        mod = GCN(
-            in_dim=in_dim, 
-            num_hidden=num_hidden, 
-            out_dim=out_dim, 
-            num_layers=num_layers, 
-            dropout=dropout, 
-            activation=activation, 
-            residual=residual, 
-            norm=create_norm(norm),
-            encoding=(enc_dec == "encoding")
         )
     elif m_type == "mlp":
         # * just for decoder 
@@ -331,48 +262,48 @@ def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropo
         raise NotImplementedError
     
     return mod
-class GraphMAE(nn.Module):
 
-    def __init__(self, config,data_feature):
-        super(GraphMAE, self).__init__()
-        nhead = config['num_heads']
-        nhead_out = config['num_out_heads']
+
+class GraphMAE(nn.Module):
+    def __init__(
+            self,
+            config,data_feature
+         ):
+        nhead = config["num_heads"]
+        nhead_out = config["num_out_heads"]
         num_hidden = config["num_hidden"]
         num_layers = config["num_layers"]
         residual = config["residual"]
         attn_drop = config["attn_drop"]
-        in_drop = config["in_drop"]
-        norm = config['norm']
-        negative_slope = config['negative_slope']
-        encoder_type = config['encoder']
-        decoder_type = config['decoder']
-        mask_rate = config['mask_rate']
-        drop_edge_rate = config['drop_edge_rate']
-        replace_rate = config['replace_rate']
+        feat_drop = config["in_drop"]
+        norm = config["norm"]
+        negative_slope = config["negative_slope"]
+        encoder_type = config["encoder"]
+        decoder_type = config["decoder"]
+        mask_rate = config["mask_rate"]
+        drop_edge_rate = config["drop_edge_rate"]
+        replace_rate = config["replace_rate"]
 
 
-        activation = config['activation']
-        loss_fn = config['loss_fn']
-        alpha_l = config['alpha_l']
-        concat_hidden = config['concat_hidden']
-        num_features =config['num_feature']['num_features']
-        in_dim=num_features
-        feat_drop=in_drop
+        activation = config["activation"]
+        loss_fn = config["loss_fn"]
+        alpha_l = config["alpha_l"]
+        concat_hidden = config["concat_hidden"]
+        in_dim =config['num_feature']['num_features']
+        super(GraphMAE, self).__init__()
+        self._mask_rate = mask_rate
+        self._encoder_type = encoder_type
+        self._decoder_type = decoder_type
+        self._drop_edge_rate = drop_edge_rate
+        self._output_hidden_size = num_hidden
+        self._concat_hidden = concat_hidden
         
-        self._mask_rate = config['mask_rate']
-
-        self._encoder_type = config['encoder']
-        self._decoder_type = config['decoder']
-        self._drop_edge_rate = config['drop_edge_rate']
-        self._output_hidden_size = config['num_hidden']
-        self._concat_hidden = config['concat_hidden']
-        
-        self._replace_rate = config['replace_rate']
+        self._replace_rate = replace_rate
         self._mask_token_rate = 1 - self._replace_rate
 
         assert num_hidden % nhead == 0
         assert num_hidden % nhead_out == 0
-        if self._encoder_type in ("gat", "dotgat"):
+        if encoder_type in ("gat", "dotgat"):
             enc_num_hidden = num_hidden // nhead
             enc_nhead = nhead
         else:
@@ -380,11 +311,11 @@ class GraphMAE(nn.Module):
             enc_nhead = 1
 
         dec_in_dim = num_hidden
-        dec_num_hidden = num_hidden // nhead_out if self._decoder_type in ("gat", "dotgat") else num_hidden 
+        dec_num_hidden = num_hidden // nhead_out if decoder_type in ("gat", "dotgat") else num_hidden 
 
         # build encoder
         self.encoder = setup_module(
-            m_type=self._encoder_type,
+            m_type=encoder_type,
             enc_dec="encoding",
             in_dim=in_dim,
             num_hidden=enc_num_hidden,
@@ -403,7 +334,7 @@ class GraphMAE(nn.Module):
 
         # build decoder for attribute prediction
         self.decoder = setup_module(
-            m_type=self._decoder_type,
+            m_type=decoder_type,
             enc_dec="decoding",
             in_dim=dec_in_dim,
             num_hidden=dec_num_hidden,
@@ -421,7 +352,7 @@ class GraphMAE(nn.Module):
         )
 
         self.enc_mask_token = nn.Parameter(torch.zeros(1, in_dim))
-        if self._concat_hidden:
+        if concat_hidden:
             self.encoder_to_decoder = nn.Linear(dec_in_dim * num_layers, dec_in_dim, bias=False)
         else:
             self.encoder_to_decoder = nn.Linear(dec_in_dim, dec_in_dim, bias=False)
@@ -442,8 +373,8 @@ class GraphMAE(nn.Module):
             raise NotImplementedError
         return criterion
     
-    def encoding_mask_noise(self, g, x, mask_rate=0.3):
-        num_nodes = g.num_nodes()
+    def encoding_mask_noise(self, x, mask_rate=0.3):
+        num_nodes = x.shape[0]
         perm = torch.randperm(num_nodes, device=x.device)
         num_mask_nodes = int(mask_rate * num_nodes)
 
@@ -468,25 +399,25 @@ class GraphMAE(nn.Module):
             out_x[mask_nodes] = 0.0
 
         out_x[token_nodes] += self.enc_mask_token
-        use_g = g.clone()
 
-        return use_g, out_x, (mask_nodes, keep_nodes)
+        return out_x, (mask_nodes, keep_nodes)
 
-    def forward(self, g, x):
+    def forward(self, x, edge_index):
         # ---- attribute reconstruction ----
-        loss = self.mask_attr_prediction(g, x)
+        loss = self.mask_attr_prediction(x, edge_index)
         loss_item = {"loss": loss.item()}
         return loss, loss_item
     
-    def mask_attr_prediction(self, g, x):
-        pre_use_g, use_x, (mask_nodes, keep_nodes) = self.encoding_mask_noise(g, x, self._mask_rate)
+    def mask_attr_prediction(self, x, edge_index):
+        use_x, (mask_nodes, keep_nodes) = self.encoding_mask_noise(x, self._mask_rate)
 
         if self._drop_edge_rate > 0:
-            use_g, masked_edges = drop_edge(pre_use_g, self._drop_edge_rate, return_edges=True)
+            use_edge_index, masked_edges = dropout_edge(edge_index, self._drop_edge_rate)
+            use_edge_index = add_self_loops(use_edge_index)[0]
         else:
-            use_g = pre_use_g
+            use_edge_index = edge_index
 
-        enc_rep, all_hidden = self.encoder(use_g, use_x, return_hidden=True)
+        enc_rep, all_hidden = self.encoder(use_x, use_edge_index, return_hidden=True)
         if self._concat_hidden:
             enc_rep = torch.cat(all_hidden, dim=1)
 
@@ -497,10 +428,10 @@ class GraphMAE(nn.Module):
             # * remask, re-mask
             rep[mask_nodes] = 0
 
-        if self._decoder_type in ("mlp", "liear") :
+        if self._decoder_type in ("mlp", "linear") :
             recon = self.decoder(rep)
         else:
-            recon = self.decoder(pre_use_g, rep)
+            recon = self.decoder(rep, use_edge_index)
 
         x_init = x[mask_nodes]
         x_rec = recon[mask_nodes]
@@ -508,8 +439,8 @@ class GraphMAE(nn.Module):
         loss = self.criterion(x_rec, x_init)
         return loss
 
-    def embed(self, g, x):
-        rep = self.encoder(g, x)
+    def embed(self, x, edge_index):
+        rep = self.encoder(x, edge_index)
         return rep
 
     @property
