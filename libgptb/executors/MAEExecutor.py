@@ -18,6 +18,7 @@ import logging
 from tqdm import tqdm
 import numpy as np
 import torch
+
 from torch import optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
@@ -25,14 +26,7 @@ from libgptb.evaluators import get_split, SVMEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from sklearn.svm import SVC
 from sklearn.metrics import f1_score
-from libgptb.graphmae.utils import (
-    build_args,
-    create_optimizer,
-    set_random_seed,
-    TBLogger,
-    get_current_lr,
-    load_best_configs,
-)
+
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from libgptb.graphmae.datasets.data_util import load_graph_classification_dataset
 from libgptb.graphmae.models import build_model
@@ -241,19 +235,27 @@ class MAEExecutor(AbstractExecutor):
                     y_list.append(labels.numpy())
                     x_list.append(out.cpu().numpy())
             x = np.concatenate(x_list, axis=0)
+            #print(x.size()[0])
             y = np.concatenate(y_list, axis=0)
-            test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
-            print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
+            #x = torch.cat(x_list, dim=0)
+            #y = torch.cat(y_list, dim=0)
+            #print(type(x.size()))
+            split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
+            #test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
+            x = torch.from_numpy(x)
+            y = torch.from_numpy(y)
+            result = SVMEvaluator()(x, y, split)
+            #print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
 
                     
-            self._logger.info('Evaluate result is ' + json.dumps(test_f1))
+            self._logger.info('Evaluate result is ' + json.dumps(result))
             filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
                             self.config['model'] + '_' + self.config['dataset']
             save_path = self.evaluate_res_dir
                 #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
                 #    json.dump(result, f)
             self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
-    def create_optimizer(opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
+    def create_optimizer(self,opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
         opt_lower = opt.lower()
 
         parameters = model.parameters()
@@ -287,7 +289,7 @@ class MAEExecutor(AbstractExecutor):
         self._logger.info('Start training ...')
         min_val_loss = float('inf')
         self.model.to(self.device)
-        optimizer = create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
+        optimizer = self.create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
         #print(optimizer)
         #print(self.config["num_classes"])
         self.optimizer=optimizer

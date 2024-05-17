@@ -154,9 +154,26 @@ class GIN(nn.Module):
         else:
             return self.head(h)
 
-    def reset_classifier(self, num_classes):
-        self.head = nn.Linear(self.out_dim, num_classes)
+    def get_embeddings(self, loader):
 
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        ret = []
+        y = []
+        with torch.no_grad():
+            for data in loader:
+
+                data = data[0]
+                data.to(device)
+                x, edge_index, batch = data.x, data.edge_index, data.batch
+                if x is None:
+                    x = torch.ones((batch.shape[0],1)).to(device)
+                x= self.forward(x, edge_index)
+
+                ret.append(x.cpu().numpy())
+                y.append(data.y.cpu().numpy())
+        ret = np.concatenate(ret, 0)
+        y = np.concatenate(y, 0)
+        return ret, y
 
 class ApplyNodeFunc(nn.Module):
     """Update the node feature hv with MLP, BN and ReLU."""
