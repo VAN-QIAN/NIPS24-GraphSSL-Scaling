@@ -13,7 +13,7 @@ def get_split(num_samples: int, train_ratio: float = 0.8, test_ratio: float = 0.
     downstream_size = int(downstream_split*train_size)
     indices = torch.load("./split/{}.pt".format(dataset))
     print(num_samples)
-    print(f"downstram_train:{downstream_size} test_size:{num_samples-train_size-test_size}")
+    print(f"{dataset} downstram_train:{downstream_size} test_size:{num_samples-train_size-test_size}")
     return {
         'train': indices[:downstream_size],
         'valid':indices[train_size:train_size+test_size],
