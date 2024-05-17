@@ -1,8 +1,5 @@
 import os
-
-
 from torch.utils.data.sampler import SubsetRandomSampler
-
 import torch.nn.functional as F
 import time
 import json
@@ -12,31 +9,16 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from logging import getLogger
-from sklearn.svm import SVC
-from sklearn.metrics import f1_score
-import logging
-from tqdm import tqdm
-import numpy as np
-import torch
-
 from torch import optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
 from libgptb.evaluators import get_split, SVMEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from sklearn.svm import SVC
-from sklearn.metrics import f1_score
-
-from sklearn.model_selection import StratifiedKFold, GridSearchCV
-from libgptb.graphmae.datasets.data_util import load_graph_classification_dataset
-from libgptb.graphmae.models import build_model
 from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
 from libgptb.evaluators import get_split, LREvaluator
-from functools import partial
-from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
-from logging import getLogger
+
 
 
 class MAEExecutor(AbstractExecutor):
@@ -48,7 +30,7 @@ class MAEExecutor(AbstractExecutor):
         self.summary_writer_dir = './libgptb/cache/{}/'.format(self.exp_id)
         self.config=config
         self._logger = getLogger()
-        self.evaluator=get_evaluator(config)
+        
         self.data_feature=data_feature
         self.device = self.config.get('device', torch.device('cpu'))
         self.exp_id = self.config.get('exp_id', None)
@@ -180,27 +162,7 @@ class MAEExecutor(AbstractExecutor):
 
   
 
-    def evaluate_graph_embeddings_using_svm(self,embeddings, labels):
-        result = []
-        kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
-
-        for train_index, test_index in kf.split(embeddings, labels):
-            x_train = embeddings[train_index]
-            x_test = embeddings[test_index]
-            y_train = labels[train_index]
-            y_test = labels[test_index]
-            params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
-            svc = SVC(random_state=42)
-            clf = GridSearchCV(svc, params)
-            clf.fit(x_train, y_train)
-
-            preds = clf.predict(x_test)
-            f1 = f1_score(y_test, preds, average="micro")
-            result.append(f1)
-        test_f1 = np.mean(result)
-        test_std = np.std(result)
-
-        return test_f1, test_std
+    
 
     def evaluate(self, test_dataloader):
         """
@@ -299,8 +261,8 @@ class MAEExecutor(AbstractExecutor):
         eval_time = []
         num_batches = len(train_dataloader)
         self._logger.info("num_batches:{}".format(num_batches))
-        epoch_iter = tqdm(range(self.max_epoch))
-        for epoch_idx in epoch_iter:
+        
+        for epoch_idx in range(self.max_epoch):
             start_time = time.time()
             losses = self._train_epoch(train_dataloader, epoch_idx)
             t1 = time.time()

@@ -4,7 +4,6 @@ import os
 import pandas as pd
 import numpy as np
 import datetime
-from logging import getLogger
 import torch_geometric.transforms as T
 from collections import namedtuple, Counter
 from torch.utils.data.sampler import SubsetRandomSampler
