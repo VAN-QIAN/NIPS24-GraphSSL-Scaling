@@ -68,7 +68,7 @@
             "evaluator": "GraphCLEvaluator"
         },
         "GraphMAE":{
-            "dataset_class": "TUDataset_MAE",
+            "dataset_class": "TUDataset",
             "executor": "MAEExecutor",
             "evaluator": "GraphMAEEvaluator"
         }

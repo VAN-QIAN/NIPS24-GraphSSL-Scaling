@@ -69,6 +69,9 @@ class MAEExecutor(AbstractExecutor):
         self.lr_scheduler_type = self.config.get('lr_scheduler', 'multisteplr')
         self.lr_scheduler = self._build_lr_scheduler()
         self.use_early_stop = self.config.get('use_early_stop', False)
+        self._epoch_num = self.config.get('epoch', 0)
+        if self._epoch_num > 0:
+            self.load_model_with_epoch(self._epoch_num)
         #print(self.model)
     def _build_lr_scheduler(self):
         """
@@ -171,6 +174,7 @@ class MAEExecutor(AbstractExecutor):
         Args:
             test_dataloader(torch.Dataloader): Dataloader
         """
+        i=0
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
@@ -197,26 +201,25 @@ class MAEExecutor(AbstractExecutor):
                     y_list.append(labels.numpy())
                     x_list.append(out.cpu().numpy())
             x = np.concatenate(x_list, axis=0)
-            #print(x.size()[0])
             y = np.concatenate(y_list, axis=0)
-            #x = torch.cat(x_list, dim=0)
-            #y = torch.cat(y_list, dim=0)
-            #print(type(x.size()))
             split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
-            #test_f1, test_std = self.evaluate_graph_embeddings_using_svm(x, y)
             x = torch.from_numpy(x)
             y = torch.from_numpy(y)
             result = SVMEvaluator()(x, y, split)
-            #print(f"#Test_f1: {test_f1:.4f}±{test_std:.4f}")
 
                     
             self._logger.info('Evaluate result is ' + json.dumps(result))
-            filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
+            filename = 'epoch'+str(epoch_idx)+"_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
                             self.config['model'] + '_' + self.config['dataset']
             save_path = self.evaluate_res_dir
-                #with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
-                #    json.dump(result, f)
-            self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
+            file_path = os.path.join(save_path, '{}.json'.format(filename))
+            if not os.path.exists(file_path):
+                os.makedirs(save_path, exist_ok=True)
+            print(filename)
+            i+=1
+            with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
+                json.dump(result, f)
+                self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
     def create_optimizer(self,opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
         opt_lower = opt.lower()
 
@@ -225,6 +228,7 @@ class MAEExecutor(AbstractExecutor):
 
         opt_split = opt_lower.split("_")
         opt_lower = opt_split[-1]
+        
         if opt_lower == "adam":
             optimizer = optim.Adam(parameters, **opt_args)
         elif opt_lower == "adamw":

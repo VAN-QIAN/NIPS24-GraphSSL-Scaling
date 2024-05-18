@@ -154,26 +154,7 @@ class GIN(nn.Module):
         else:
             return self.head(h)
 
-    def get_embeddings(self, loader):
 
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        ret = []
-        y = []
-        with torch.no_grad():
-            for data in loader:
-
-                data = data[0]
-                data.to(device)
-                x, edge_index, batch = data.x, data.edge_index, data.batch
-                if x is None:
-                    x = torch.ones((batch.shape[0],1)).to(device)
-                x= self.forward(x, edge_index)
-
-                ret.append(x.cpu().numpy())
-                y.append(data.y.cpu().numpy())
-        ret = np.concatenate(ret, 0)
-        y = np.concatenate(y, 0)
-        return ret, y
 
 class ApplyNodeFunc(nn.Module):
     """Update the node feature hv with MLP, BN and ReLU."""
@@ -236,24 +217,7 @@ class MLP(nn.Module):
             return self.linears[-1](h)
 
 def setup_module(m_type, enc_dec, in_dim, num_hidden, out_dim, num_layers, dropout, activation, residual, norm, nhead, nhead_out, attn_drop, negative_slope=0.2, concat_out=True) -> nn.Module:
-    if m_type == "gat":
-        mod = GAT(
-            in_dim=in_dim,
-            num_hidden=num_hidden,
-            out_dim=out_dim,
-            num_layers=num_layers,
-            nhead=nhead,
-            nhead_out=nhead_out,
-            concat_out=concat_out,
-            activation=activation,
-            feat_drop=dropout,
-            attn_drop=attn_drop,
-            negative_slope=negative_slope,
-            residual=residual,
-            norm=create_norm(norm),
-            encoding=(enc_dec == "encoding"),
-        )
-    elif m_type == "gin":
+    if m_type == "gin":
         mod = GIN(
             in_dim=int(in_dim),
             num_hidden=int(num_hidden),
@@ -306,7 +270,7 @@ class GraphMAE(nn.Module):
         loss_fn = config["loss_fn"]
         alpha_l = config["alpha_l"]
         concat_hidden = config["concat_hidden"]
-        in_dim =config['num_feature']['num_features']
+        in_dim =config['num_feature']['input_dim']
         super(GraphMAE, self).__init__()
         self._mask_rate = mask_rate
         self._encoder_type = encoder_type

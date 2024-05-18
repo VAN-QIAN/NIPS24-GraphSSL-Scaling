@@ -5,7 +5,7 @@ from libgptb.data.dataset.sgc_dataset import SGCDataset
 from libgptb.data.dataset.tu_dataset_graphcl import TUDataset_graphcl
 from libgptb.data.dataset.tu_dataset_aug import TUDataset_aug
 from libgptb.data.dataset.tu_dataset import TUDataset
-from libgptb.data.dataset.TUDataset_MAE import TUDataset_MAE
+#from libgptb.data.dataset.TUDataset_MAE import TUDataset_MAE
 __all__ = [
     "AbstractDataset",
     "PyGDataset",
@@ -13,6 +13,5 @@ __all__ = [
     "SGCDataset",
     "TUDataset_graphcl",
     "TUDataset_aug",
-    "TUDataset",
-    "TUDdataset_MAE "
+    "TUDataset"
 ]
