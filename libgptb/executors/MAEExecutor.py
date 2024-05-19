@@ -43,10 +43,11 @@ class MAEExecutor(AbstractExecutor):
         self.num_layers = config['num_layers']
         self.encoder_type = config['encoder']
         self.decoder_type = config['decoder']
-        self.replace_rate = config['replace_rate']
         self.optim_type = config['optimizer'] 
         self.loss_fn = config['loss_fn']
-        self.lr = config['lr']
+        self.learner = self.config.get('learner', 'adam')
+        self.learning_rate = config['learning_rate']
+        print("lr: {}".format(self.learning_rate))
         self.weight_decay = config['weight_decay']
         self.lr_f = config['lr_f']
         self.weight_decay_f = config['weight_decay_f']
@@ -219,28 +220,31 @@ class MAEExecutor(AbstractExecutor):
             with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
                 json.dump(result, f)
                 self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
-    def create_optimizer(self,opt, model, lr, weight_decay, get_num_layer=None, get_layer_scale=None):
-        opt_lower = opt.lower()
-
-        parameters = model.parameters()
-        opt_args = dict(lr=lr, weight_decay=weight_decay)
-
-        opt_split = opt_lower.split("_")
-        opt_lower = opt_split[-1]
-        
-        if opt_lower == "adam":
-            optimizer = optim.Adam(parameters, **opt_args)
-        elif opt_lower == "adamw":
-            optimizer = optim.AdamW(parameters, **opt_args)
-        elif opt_lower == "adadelta":
-            optimizer = optim.Adadelta(parameters, **opt_args)
-        elif opt_lower == "radam":
-            optimizer = optim.RAdam(parameters, **opt_args)
-        elif opt_lower == "sgd":
-            opt_args["momentum"] = 0.9
-            return optim.SGD(parameters, **opt_args)
+    def create_optimizer(self):
+        """
+        根据全局参数`learner`选择optimizer
+        """
+        self._logger.info('You select `{}` optimizer.'.format(self.learner.lower()))
+        if self.learner.lower() == 'adam':
+            optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        elif self.learner.lower() == 'sgd':
+            optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate,
+                                        momentum=self.lr_momentum, weight_decay=self.weight_decay)
+        elif self.learner.lower() == 'adagrad':
+            optimizer = torch.optim.Adagrad(self.model.parameters(), lr=self.learning_rate,
+                                            eps=self.lr_epsilon, weight_decay=self.weight_decay)
+        elif self.learner.lower() == 'rmsprop':
+            optimizer = torch.optim.RMSprop(self.model.parameters(), lr=self.learning_rate,
+                                            alpha=self.lr_alpha, eps=self.lr_epsilon,
+                                            momentum=self.lr_momentum, weight_decay=self.weight_decay)
+        elif self.learner.lower() == 'sparse_adam':
+            optimizer = torch.optim.SparseAdam(self.model.parameters(), lr=self.learning_rate,
+                                               eps=self.lr_epsilon, betas=self.lr_betas)
         else:
-            assert False and "Invalid optimizer"
+            self._logger.warning('Received unrecognized optimizer, set default Adam optimizer')
+            optimizer = torch.optim.Adam(self.model.encoder_model.parameters(), lr=self.learning_rate,
+                                         eps=self.lr_epsilon, weight_decay=self.weight_decay)
+        return optimizer
 
         return optimizer
     def train(self, train_dataloader, eval_dataloader):
@@ -254,7 +258,7 @@ class MAEExecutor(AbstractExecutor):
         self._logger.info('Start training ...')
         min_val_loss = float('inf')
         self.model.to(self.device)
-        optimizer = self.create_optimizer(self.optim_type, self.model, self.lr, self.weight_decay)
+        optimizer = self.create_optimizer()
         #print(optimizer)
         #print(self.config["num_classes"])
         self.optimizer=optimizer

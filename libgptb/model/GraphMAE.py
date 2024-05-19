@@ -1,6 +1,7 @@
 from typing import Optional
 from itertools import chain
 from functools import partial
+
 import torch
 import torch.nn as nn
 from torch_geometric.utils import dropout_edge
@@ -8,6 +9,7 @@ from torch_geometric.utils import add_self_loops, remove_self_loops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from torch_geometric.nn import GINConv, MLP
 def sce_loss(x, y, alpha=3):
     x = F.normalize(x, p=2, dim=-1)
