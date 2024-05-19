@@ -61,5 +61,15 @@
             "executor": "MVGRLgExecutor",
             "evaluator": "MVGRLgEvaluator"
         }
+    },
+    "SGC":{
+        "allowed_model":["GraphMAE"],
+        "allowed_dataset":["ogbg-molhiv","ogbg-ppa","AIDS","MCF-7","IMDB-BINARY","MOLT-4","BZR","P388","ZINC_full","reddit_threads","MUTAG","PTC_MR","DD","PROTEINS","NCI1","NCI109","github_stargazers"],
+        
+        "GraphMAE":{
+            "dataset_class": "TUDataset",
+            "executor": "MAEExecutor",
+            "evaluator": "GraphMAEEvaluator"
+        }
     }
 }

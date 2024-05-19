@@ -43,7 +43,7 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
     # transform the dataset and split
     data = dataset.get_data()
     # train_data, valid_data, test_data = data
-    if config['task'] == 'SSGCL':
+    if config['task'] == 'SSGCL'or config['task']=='SGC':
         train_data = data['train']
         valid_data = data['valid']
         test_data = data['test']
@@ -62,6 +62,7 @@ def run_model(task=None, model_name=None, dataset_name=None, config_file=None,
     print(config['model'])
     executor = get_executor(config, model, data_feature)
     # train
+    
     if train or not os.path.exists(model_cache_file):
         executor.train(train_data, valid_data)
         if saved_model:

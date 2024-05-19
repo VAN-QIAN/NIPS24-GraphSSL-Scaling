@@ -6,6 +6,6 @@ from libgptb.data.dataset.tu_dataset import TUDataset
 __all__ = [
     "AbstractDataset",
     "PyGDataset",
-    "DGLDataset"
+    "DGLDataset",
     "TUDataset"
 ]
