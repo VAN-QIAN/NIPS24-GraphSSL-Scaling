@@ -39,7 +39,7 @@ class MAEExecutor(AbstractExecutor):
         self.max_epoch = config['max_epoch']
         self.evaluate_res_dir = './libgptb/cache/{}/evaluate_cache'.format(self.exp_id)
         self.max_epoch_f =config['max_epoch_f']
-        self.num_hidden = config['num_hidden']
+        self.num_hidden = config['nhid']
         self.num_layers = config['num_layers']
         self.encoder_type = config['encoder']
         self.decoder_type = config['decoder']
@@ -49,7 +49,6 @@ class MAEExecutor(AbstractExecutor):
         self.learning_rate = config['learning_rate']
         print("lr: {}".format(self.learning_rate))
         self.weight_decay = config['weight_decay']
-        self.lr_f = config['lr_f']
         self.weight_decay_f = config['weight_decay_f']
         self.linear_prob = config['linear_prob']
         self.scheduler = config['scheduler']

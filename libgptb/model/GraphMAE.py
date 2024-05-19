@@ -248,11 +248,11 @@ class GraphMAE(nn.Module):
          ):
         nhead = config["num_heads"]
         nhead_out = config["num_out_heads"]
-        num_hidden = config["num_hidden"]
+        num_hidden = config["nhid"]
         num_layers = config["num_layers"]
         residual = config["residual"]
         attn_drop = config["attn_drop"]
-        feat_drop = config["in_drop"]
+        feat_drop = config["drop_feature_rate"]
         norm = config["norm"]
         negative_slope = config["negative_slope"]
         encoder_type = config["encoder"]
@@ -266,7 +266,7 @@ class GraphMAE(nn.Module):
         loss_fn = config["loss_fn"]
         alpha_l = config["alpha_l"]
         concat_hidden = config["concat_hidden"]
-        in_dim =config['num_feature']['input_dim']
+        in_dim =data_feature['input_dim']
         super(GraphMAE, self).__init__()
         self._mask_rate = mask_rate
         self._encoder_type = encoder_type
