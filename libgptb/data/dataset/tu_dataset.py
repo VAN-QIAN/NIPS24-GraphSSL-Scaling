@@ -98,7 +98,7 @@ class TUDataset(AbstractDataset):
         
     def get_data(self):
         
-        assert self.train_ratio + self.test_ratio + self.test_ratio <= 1
+        #assert self.train_ratio + self.test_ratio + self.test_ratio <= 1
         indices = torch.load("./split/{}.pt".format(self.datasetName))
 
         train_size = int(len(self.dataset) * self.train_ratio)

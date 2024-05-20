@@ -1,13 +1,13 @@
 #!/bin/bash
 
-ratio=0.1
+ratio=("1" "0.9" "0.8" "0.7" "0.6" "0.5" "0.4" "0.3" "0.2" "0.1")
 
-models=('MVGRLg') 
-datasets=('MUTAG')
-template='singularity exec --writable-tmpfs --nv /data/zhehua/SIF/mvgrl.sif python3 ./run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --ratio RATIO_PLACEHOLDER --config_file random_config/mvgrlg'
+models=('GraphMAE')
+datasets=( "github_stargazers")
+template='singularity exec --nv /data/qianMa/SIF/bgpmv116.sif  python3 ./run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --train_ratio RATIO_PLACEHOLDER --config_file random_config/mvgrlg'
 commands=()
 
-for i in $(seq 0 $ratio 1); do
+for i in ${ratio[@]}; do
     for dataset in "${datasets[@]}"; do
         for model in "${models[@]}"; do
             command="${template/MODEL_PLACEHOLDER/$model}"

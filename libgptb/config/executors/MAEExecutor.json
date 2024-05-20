@@ -37,7 +37,6 @@
   "deg4feat":false,
   "batch_size":32,
   "concat_hidden":false,
-  "train_ratio":0.8,
   "valid_ratio":0.1,
   "test_ratio":0.1
 }
