@@ -16,4 +16,4 @@ cd /data-valuation &&
 pip list | grep torch &&
 rm -f /usr/lib64/libstdc++.so.6 &&
 ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
-/bin/bash /data-valuation/split_cci.sh
+/bin/bash /data-valuation/split_cci.sh'
