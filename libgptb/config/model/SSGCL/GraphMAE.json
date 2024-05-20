@@ -1,0 +1,5 @@
+{
+    "num_gc_layers": 3,
+    "input_dim": 5,
+    "prior": "False"
+}
