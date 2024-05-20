@@ -1,4 +1,4 @@
-#!/bin/scratch
+#!/bin/bash
 #SBATCH --job-name=run_split_enroot       # Job name
 #SBATCH --partition=el8-rpi               # Partition
 #SBATCH --gres=gpu:1                      # Request GPU resource
@@ -10,10 +10,10 @@
 SCRIPT_DIR="$HOME/KDD24-BGPM"
 
 # Start the enroot container and run the split.sh script
-enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c 
+enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
 ls -l /data-valuation &&
 cd /data-valuation &&
 pip list | grep torch &&
 rm -f /usr/lib64/libstdc++.so.6 &&
 ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
-/bin/scratch /data-valuation/split_cci.sh
+/bin/bash /data-valuation/split_cci.sh
