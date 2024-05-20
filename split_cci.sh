@@ -5,7 +5,7 @@ ratio=0.9
 models=('GraphMAE')
 datasets=("reddit_threads" "github_stargazers")
 #datasets=("MUTAG" "MCF-7" "MOLT-4" "P388" "ZINC_full" "reddit_threads" "github_stargazers")
-template="python3 /data-valuation/run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --ratio RATIO_PLACEHOLDER --downstream_ratio 0.1 --downstream_task loss --config_file /data-valuation/random_config/mvgrlg"
+template="python3 /data-valuation/run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --ratio RATIO_PLACEHOLDER --downstream_ratio 0.1 --downstream_task loss --config_file random_config/config_1"
 commands=()
 
 for model in "${models[@]}"; do
