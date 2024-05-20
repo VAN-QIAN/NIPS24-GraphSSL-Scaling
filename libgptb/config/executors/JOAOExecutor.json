@@ -1,0 +1,13 @@
+{
+    "gpu": true,
+    "gpu_id": 3,
+    "epochs": 100,
+    "log_interval": 10,
+    "batch_size": 128,
+    "learning_rate": 0.01,
+    "aug": "minmax",
+    "local": "True",
+    "prior": "False",
+    "gamma": 0.1,
+    "mode":"fast"
+}
