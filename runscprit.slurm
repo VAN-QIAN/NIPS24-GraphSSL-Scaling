@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/scratch
 #SBATCH --job-name=run_split_enroot       # Job name
 #SBATCH --partition=el8-rpi               # Partition
 #SBATCH --gres=gpu:1                      # Request GPU resource
@@ -16,4 +16,4 @@ cd /data-valuation &&
 pip list | grep torch &&
 rm -f /usr/lib64/libstdc++.so.6 &&
 ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
-/bin/bash /data-valuation/split_cci.sh
+/bin/scratch /data-valuation/split_cci.sh
