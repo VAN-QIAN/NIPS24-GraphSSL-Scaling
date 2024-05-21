@@ -10,7 +10,7 @@
 SCRIPT_DIR="$HOME/KDD24-BGPM"
 
 # Start the enroot container and run the split.sh script
-enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation feng_env sh -c 
+enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation feng_env sh -c '
 ls -l /data-valuation &&
 cd /data-valuation &&
 pip list | grep torch &&
