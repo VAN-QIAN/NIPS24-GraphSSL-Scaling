@@ -7,14 +7,20 @@
 #SBATCH --error=slurm_logs/run_cci_%j.err   # Error log
 
 # Define the path to the script directory
-SCRIPT_DIR="$HOME/KDD24-BGPM"
+SCRIPT_DIR="$HOME/barn/KDD24-BGPM"
+LOG_DIR="$HOME/scratch/log"
+RAW_DATA_DIR="$HOME/scratch/raw_data"
 
 # Start the enroot container and run the split.sh script
-enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
-ls -l /data-valuation &&
-cd /data-valuation &&
+enroot start --root --rw \
+    --mount $SCRIPT_DIR:/KDD24-BGPM\
+    --mount $LOG_DIR:/scratch/log\
+    --mount $RAW_DATA_DIR:/scratch/raw_data\
+    bgpm sh -c '
+ls -l /KDD24-BGPM &&
+cd /KDD24-BGPM &&
 pip list | grep torch &&
 rm -f /usr/lib64/libstdc++.so.6 &&
 ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
-/bin/bash /data-valuation/split_cci.sh
+/bin/bash /KDD24-BGPM/split_cci.sh
 '

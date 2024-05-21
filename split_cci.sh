@@ -6,7 +6,7 @@ models=('GraphCL')
 datasets=( "reddit_threads")
 tasks=('original' 'loss') 
 #datasets=("MUTAG" "MCF-7" "MOLT-4" "P388" "ZINC_full" "reddit_threads" "github_stargazers")
-template='python3 /data-valuation/run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --ratio RATIO_PLACEHOLDER --downstream_ratio 0.1 --downstream_task TASK_PLACEHOLDER'
+template='python3 /KDD24-BGPM/run_model.py --task SSGCL --model MODEL_PLACEHOLDER --dataset DATASET_PLACEHOLDER --ratio RATIO_PLACEHOLDER --downstream_ratio 0.1 --downstream_task TASK_PLACEHOLDER'
 commands=()
 
 for model in "${models[@]}"; do
