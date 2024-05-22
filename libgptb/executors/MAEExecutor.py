@@ -123,9 +123,13 @@ class MAEExecutor(AbstractExecutor):
             cache_name(str): 保存的文件名
         """
         self._logger.info("Loaded model at " + cache_name)
+        print(1)
         model_state, optimizer_state = torch.load(cache_name)
+        print(1)
         self.model.load_state_dict(model_state)
+        print(1)
         self.optimizer.load_state_dict(optimizer_state)
+        print(1)
     def save_model_with_epoch(self, epoch):
         """
         保存某个epoch的模型
@@ -176,14 +180,22 @@ class MAEExecutor(AbstractExecutor):
         i=0
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
-        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+        for epoch_idx in [1-1,10-1,20-1,40-1,60-1,80-1,100-1]:
+            if epoch_idx in [0] and self.config['dataset'] not in ["ogbg-ppa"]:
+                continue
             if epoch_idx+1 > self.max_epoch:
                 break
+            self.load_model_with_epoch(epoch_idx)
+            print("finish")
+            losses = self._train_epoch(test_dataloader, epoch_idx)
+            result2 = np.mean(losses)     
             self.model.eval()
             x_list = []
             y_list = []
+            print(len(test_dataloader))
             with torch.no_grad():
                 for i, batch_g in enumerate(test_dataloader):
+                    
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
@@ -196,22 +208,36 @@ class MAEExecutor(AbstractExecutor):
                         out = global_add_pool(out, batch_g.batch)
                     else:
                         raise NotImplementedError
-
+                    print(feat)
+                    print(labels)
+                    #print(labels.numpy())
+                    #print(out.cpu().numpy)
                     y_list.append(labels.numpy())
                     x_list.append(out.cpu().numpy())
             x = np.concatenate(x_list, axis=0)
             y = np.concatenate(y_list, axis=0)
+            print("here")
             split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
+            print("next")
+            print(x)
             x = torch.from_numpy(x)
+            print(x)
             y = torch.from_numpy(y)
+            print(y)
+            
+            print("------------------------------")
+            print(split)
             result = SVMEvaluator()(x, y, split)
 
                     
             self._logger.info('Evaluate result is ' + json.dumps(result))
+            self._logger.info('Evaluate result2 is ' + json.dumps(result2))
             filename = 'epoch'+str(epoch_idx)+"_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
                             self.config['model'] + '_' + self.config['dataset']
             save_path = self.evaluate_res_dir
             file_path = os.path.join(save_path, '{}.json'.format(filename))
+            if self.config['dataset'] in ["ogbg-ppa"]:
+                break
             if not os.path.exists(file_path):
                 os.makedirs(save_path, exist_ok=True)
             print(filename)
@@ -293,7 +319,10 @@ class MAEExecutor(AbstractExecutor):
                 message = 'Epoch [{}/{}] train_loss: {:.4f}, lr: {:.6f}, {:.2f}s'.\
                     format(epoch_idx, self.max_epoch, np.mean(losses),  log_lr, (end_time - start_time))
                 self._logger.info(message)
-
+            if epoch_idx+1 in [1] and self.config['dataset'] in ["ogbg-ppa"]:
+                model_file_name = self.save_model_with_epoch(epoch_idx)
+                self._logger.info('saving to {}'.format(model_file_name))
+                break
             #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
             if epoch_idx+1 in [10,20,40,60,80,100]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)
@@ -344,4 +373,4 @@ class MAEExecutor(AbstractExecutor):
                 loss.backward()
                 self.optimizer.step()
           
-        return loss_all /len(train_dataloader)
+        return loss_all 
