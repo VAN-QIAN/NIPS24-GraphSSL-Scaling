@@ -7,7 +7,7 @@
 #SBATCH --error=slurm_logs/run_cci_%j.err   # Error log
 
 # Define the path to the script directory
-SCRIPT_DIR="$HOME/scratch/data-valuation"
+SCRIPT_DIR="$HOME/scratch/KDD24-BGPM"
 
 # Start the enroot container and run the split.sh script
 enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
