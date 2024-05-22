@@ -32,6 +32,7 @@ class TUDataset(AbstractDataset):
     def _load_data(self):
         device = torch.device('cuda')
         path = osp.join("/data-valuation", 'raw_data')
+        print(path)
         deg4feat=False
         print(self.datasetName)
         # orignal paper choices of datasets.
