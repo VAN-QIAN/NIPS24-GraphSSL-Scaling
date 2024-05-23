@@ -21,5 +21,5 @@ done
 
 for command in "${commands[@]}"; do
     echo $command
-    eval $command
+    echo y |eval $command
 done
