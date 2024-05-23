@@ -31,9 +31,7 @@ class TUDataset(AbstractDataset):
         
     def _load_data(self):
         device = torch.device('cuda')
-        path = ""
-        path = osp.join("", 'raw_data')
-        print(path)
+        path = osp.join("KDD24-BGPM", 'raw_data')
         deg4feat=False
         print(self.datasetName)
         # orignal paper choices of datasets.
@@ -47,6 +45,7 @@ class TUDataset(AbstractDataset):
         
         self.dataset = list(self.dataset)
         graph = self.dataset[0]
+        print(graph)
         if graph.x == None:
             if graph.y and not deg4feat:
                 print("Use node label as node features")
@@ -86,10 +85,25 @@ class TUDataset(AbstractDataset):
 
         else:
             print("******** Use `attr` as node features ********")
+        
         feature_dim = int(graph.num_features)
-
-        labels = torch.tensor([x.y for x in self.dataset])
-    
+        
+        if self.datasetName in ["ogbg-molpcba"]:
+            labels = torch.stack([torch.nan_to_num(x.y, nan=0.0) for x in self.dataset])
+        elif self.datasetName in ["ogbg-code2"]:
+            for i, g in enumerate(self.dataset):
+                print(g.y)
+            valid_labels = [x.y for x in self.dataset if isinstance(x.y, (torch.Tensor, list, tuple, int, float))]
+            labels = torch.stack([torch.tensor(y) if not isinstance(y, torch.Tensor) else y for y in valid_labels])
+        else:
+            print("enter")
+            labels = torch.tensor([x.y for x in self.dataset])
+        print(graph.x)
+        print(graph.y)    
+        if self.datasetName in ["ogbg-molhiv", "ogbg-molpcba",  "ogbg-code2"]:
+            for i, g in enumerate(self.dataset):
+                g.x = g.x.float()
+        
         num_classes = torch.max(labels).item() + 1
         for i, g in enumerate(self.dataset):
             self.dataset[i].edge_index = remove_self_loops(self.dataset[i].edge_index)[0]

@@ -378,8 +378,7 @@ class GraphMAE(nn.Module):
             out_x = x.clone()
             token_nodes = mask_nodes
             out_x[mask_nodes] = 0.0
-        if datatype in ["ogbg-molhiv", "ogbg-molpcba", "ogbg-ppa", "ogbg-code2"]:
-            token_nodes= token_nodes.to(dtype=torch.float)
+
         out_x[token_nodes] += self.enc_mask_token
 
         return out_x, (mask_nodes, keep_nodes)
