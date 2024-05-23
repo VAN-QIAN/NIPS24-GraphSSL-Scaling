@@ -1,5 +1,5 @@
 #!/bin/bash
-models=("34542"	"25980"	"61008"	"46587"	"89759"	"67451")
+models=("67225")
 template='singularity exec --writable-tmpfs --nv /data/zhehua/SIF/mvgrl.sif python3 ./run_model.py --task SSGCL --model MVGRLg --dataset ZINC_full --exp_id EVAL_PLACEHOLDER --train False --downstream_ratio 0.03125 --downstream_task loss --config_file random_config/mvgrlg'
 commands=()
 
