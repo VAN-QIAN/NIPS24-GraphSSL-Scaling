@@ -10,9 +10,9 @@
 SCRIPT_DIR="$HOME/scratch/KDD24-BGPM"
 
 # Start the enroot container and run the split.sh script
-enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
-ls -l /data-valuation &&
-cd /data-valuation &&
+enroot start --root --rw --mount $SCRIPT_DIR:/KDD24-BGPM bgpm sh -c '
+ls -l /KDD24-BGPM &&
+cd /KDD24-BGPM &&
 pip list | grep torch &&
 rm -f /usr/lib64/libstdc++.so.6 &&
 ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
