@@ -7,7 +7,7 @@
 #SBATCH --error=slurm_logs/run_cci_%j.err   # Error log
 
 # Define the path to the script directory
-SCRIPT_DIR="$HOME/scratch/MAE"
+SCRIPT_DIR="$HOME/scratch/KDD24-BGPM"
 enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
 export http_proxy=http://proxy:8888 &&
 export https_proxy=$http_proxy &&
