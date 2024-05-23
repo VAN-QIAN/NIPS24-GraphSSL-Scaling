@@ -2,7 +2,7 @@
 #SBATCH --job-name=run_split_enroot       # Job name
 #SBATCH --partition=el8               # Partition
 #SBATCH --gres=gpu:1                      # Request GPU resource
-#SBATCH --time=00:10:00                   # Time limit hrs:min:sec
+#SBATCH --time=01:30:00                   # Time limit hrs:min:sec
 #SBATCH --output=slurm_logs/run_cci_%j.log  # Standard output and error log
 #SBATCH --error=slurm_logs/run_cci_%j.err   # Error log
 
