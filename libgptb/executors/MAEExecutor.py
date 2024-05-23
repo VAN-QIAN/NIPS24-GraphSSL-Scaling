@@ -271,6 +271,10 @@ class MAEExecutor(AbstractExecutor):
 
         return optimizer
     def train(self, train_dataloader, eval_dataloader):
+        if self.config['exp_id']=='67225' :
+            return 0
+        if self.config['exp_id']==67225 :
+            return 0
         """
         use data to train model with config
 
