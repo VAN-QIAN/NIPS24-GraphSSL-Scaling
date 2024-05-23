@@ -221,7 +221,7 @@ class MAEExecutor(AbstractExecutor):
             print("next")
             print(x)
             print(y)
-            
+            y=column_or_1d(y,warn=True)
             print("------------------------------")
             print(split)
             result = SVMEvaluator(linear=True)(x, y, split)
