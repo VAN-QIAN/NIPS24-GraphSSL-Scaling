@@ -8,12 +8,16 @@
 
 # Define the path to the script directory
 SCRIPT_DIR="$HOME/scratch/KDD24-BGPM"
-
-# Start the enroot container and run the split.sh script
 enroot start --root --rw --mount $SCRIPT_DIR:/data-valuation bgpm sh -c '
+export http_proxy=http://proxy:8888 &&
+export https_proxy=$http_proxy &&
+git clone https://github.com/snap-stanford/ogb &&
+cd ogb &&
+pip install -e . &&
+rm -f /usr/lib64/libstdc++.so.6 &&
+ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
 ls -l /data-valuation &&
 cd /data-valuation &&
 pip list | grep torch &&
-rm -f /usr/lib64/libstdc++.so.6 &&
-ln -s /root/miniconda3/lib/libstdc++.so.6.0.29 /usr/lib64/libstdc++.so.6 &&
+nvidia-smi &&
 /bin/bash split_cci.sh'
