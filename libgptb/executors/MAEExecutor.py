@@ -224,7 +224,7 @@ class MAEExecutor(AbstractExecutor):
             
             print("------------------------------")
             print(split)
-            result = SVMEvaluator()(x, y, split)
+            result = SVMEvaluator(linear=True)(x, y, split)
 
                     
             self._logger.info('Evaluate result is ' + json.dumps(result))
