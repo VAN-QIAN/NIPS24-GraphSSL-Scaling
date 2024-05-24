@@ -241,6 +241,8 @@ class MAEExecutor(AbstractExecutor):
                     x_list.append(out)
             x = np.concatenate(x_list, axis=0)
             y = np.concatenate(y_list, axis=0)
+            x = torch.tensor(x, dtype=torch.float32)
+            y = torch.tensor(y, dtype=torch.long)
             print(y)
             print("here")
             split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
