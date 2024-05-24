@@ -3,6 +3,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
 import time
 import json
+from sklearn.utils import column_or_1d
 import numpy as np
 import datetime
 import torch
