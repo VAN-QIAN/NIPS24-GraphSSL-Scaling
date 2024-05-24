@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import datetime
 from logging import getLogger
+from sklearn.utils import column_or_1d
 import torch_geometric.transforms as T
 from torch_geometric.datasets import TUDataset
 from libgptb.data.dataset.abstract_dataset import AbstractDataset
