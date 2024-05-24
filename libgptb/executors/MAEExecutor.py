@@ -64,7 +64,7 @@ class MAEExecutor(AbstractExecutor):
         self.max_epoch_f =config['max_epoch_f']
         self.num_hidden = config['nhid']
         self.num_layers = config['num_layers']
-        self.nclass=self.config.get('num_classes', 2)
+        self.nclasses=self.config.get('num_classes', 2)
         self.encoder_type = config['encoder']
         self.decoder_type = config['decoder']
         self.optim_type = config['optimizer'] 
