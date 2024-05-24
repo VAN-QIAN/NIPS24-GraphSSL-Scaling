@@ -45,6 +45,8 @@ class TUDataset(AbstractDataset):
         
         self.dataset = list(self.dataset)
         graph = self.dataset[0]
+        y = column_or_1d(graph.y, warn=True).ravel()
+        print(y)
         print(graph)
         if graph.x == None:
             if graph.y and not deg4feat:
