@@ -201,6 +201,7 @@ class MAEExecutor(AbstractExecutor):
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
+                    labels = column_or_1d(labels.numpy(), warn=True).ravel()
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
