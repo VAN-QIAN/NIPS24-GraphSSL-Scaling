@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ratio=( "0.1")
+ratio=( "0.2")
 
 models=('GraphMAE')
 datasets=("ogbg-ppa")
