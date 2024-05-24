@@ -19,6 +19,7 @@ from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
 from libgptb.evaluators import get_split, LREvaluator
+from sklearn.svm import SVC
 
 def evaluate_graph_embeddings_using_svm(embeddings, labels):
     result = []
