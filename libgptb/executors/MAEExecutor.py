@@ -189,7 +189,7 @@ class MAEExecutor(AbstractExecutor):
             print("finish")
             losses = self._train_epoch(test_dataloader, epoch_idx)
             result2 = np.mean(losses)  
-            
+             
             self.model.eval()
             x_list = []
             y_list = []
@@ -201,6 +201,7 @@ class MAEExecutor(AbstractExecutor):
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
+                    labels = column_or_1d(batch_g, warn=True).ravel()
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
@@ -222,8 +223,7 @@ class MAEExecutor(AbstractExecutor):
             print("next")
             print(x)
             print(y)
-            y = column_or_1d(y, warn=True)
-            y = y.ravel()
+           
             print("------------------------------")
             print(split)
             result = SVMEvaluator(linear=True)(x, y, split)
