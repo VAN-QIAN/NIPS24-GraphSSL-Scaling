@@ -14,4 +14,4 @@ cd /data-valuation &&
 
 pip list | grep torch &&
 nvidia-smi &&
-/bin/bash ./run_task.sh "'"$1"'" "'"$2"'" "'"$3"'"
+/bin/bash ./run_task.sh "'"$1"'" "'"$2"'" "'"$3"'" '
