@@ -28,6 +28,7 @@ class TUDataset(AbstractDataset):
         config['num_feature']={
             "input_dim": max(self.num_features, 1)
         }
+        config['num_classes']=self.num_classes
         
         
     def _load_data(self):
@@ -113,6 +114,7 @@ class TUDataset(AbstractDataset):
         #dataset = [(g, g.y) for g in dataset]
         self.num_features=feature_dim
         self.num_classes=num_classes
+        
         
     def get_data(self):
         
