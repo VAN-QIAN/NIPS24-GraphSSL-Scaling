@@ -13,7 +13,7 @@ from logging import getLogger
 from torch import optim as optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
-from libgptb.evaluators import get_split, SVMEvaluator
+from libgptb.evaluators import get_split, SVMEvaluator,PyTorchEvaluator
 from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
@@ -201,8 +201,6 @@ class MAEExecutor(AbstractExecutor):
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
-                    y_cpu = batch_g.y.cpu()
-                    labels = column_or_1d(y_cpu, warn=True).ravel()
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
