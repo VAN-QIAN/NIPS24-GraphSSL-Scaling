@@ -52,6 +52,7 @@ class TUDataset(AbstractDataset):
                 print("Use node label as node features")
                 feature_dim = 0
                 for g in dataset:
+                    print(g.y)
                     feature_dim = max(feature_dim, int(g.y.max().item()))
             
                 feature_dim += 1
