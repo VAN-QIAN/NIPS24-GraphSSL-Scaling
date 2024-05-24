@@ -47,13 +47,11 @@ class TUDataset(AbstractDataset):
         
         self.dataset = list(self.dataset)
         graph = self.dataset[0]
-        print(graph)
         if graph.x == None:
             if graph.y and not deg4feat:
                 print("Use node label as node features")
                 feature_dim = 0
-                for g in dataset:
-                    print(g.y)
+                for g in self.dataset:
                     feature_dim = max(feature_dim, int(g.y.max().item()))
             
                 feature_dim += 1
@@ -99,10 +97,7 @@ class TUDataset(AbstractDataset):
             valid_labels = [x.y for x in self.dataset if isinstance(x.y, (torch.Tensor, list, tuple, int, float))]
             labels = torch.stack([torch.tensor(y) if not isinstance(y, torch.Tensor) else y for y in valid_labels])
         else:
-            print("enter")
-            labels = torch.tensor([x.y for x in self.dataset])
-        print(graph.x)
-        print(graph.y)    
+            labels = torch.tensor([x.y for x in self.dataset]) 
         if self.datasetName in ["ogbg-molhiv", "ogbg-molpcba",  "ogbg-code2"]:
             for i, g in enumerate(self.dataset):
                 g.x = g.x.float()

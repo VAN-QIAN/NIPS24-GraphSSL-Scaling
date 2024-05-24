@@ -209,7 +209,6 @@ class MAEExecutor(AbstractExecutor):
             if epoch_idx+1 > self.max_epoch:
                 break
             self.load_model_with_epoch(epoch_idx)
-            print("finish")
             losses = self._train_epoch(test_dataloader, epoch_idx)
             result2 = np.mean(losses)  
              
@@ -241,15 +240,7 @@ class MAEExecutor(AbstractExecutor):
                     x_list.append(out)
             x = torch.cat(x_list, dim=0)
             y = torch.cat(y_list, dim=0)
-            print(y)
-            print("here")
             split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
-            print("next")
-            print(x)
-            print(y)
-           
-            print("------------------------------")
-            print(split)
             #result = SVMEvaluator(linear=True)(x, y, split)
             #test_f1, test_std = evaluate_graph_embeddings_using_svm(x, y)
             result=PyTorchEvaluator(n_features=x.shape[1],n_classes=self.nclasses)(x, y, split)
