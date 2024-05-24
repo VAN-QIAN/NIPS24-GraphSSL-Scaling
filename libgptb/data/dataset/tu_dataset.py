@@ -46,6 +46,7 @@ class TUDataset(AbstractDataset):
         
         self.dataset = list(self.dataset)
         graph = self.dataset[0]
+        print(graph.y)
         y = column_or_1d(graph.y, warn=True).ravel()
         print(y)
         print(graph)
