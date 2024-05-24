@@ -7,7 +7,7 @@ from logging import getLogger
 from libgptb.evaluator.abstract_evaluator import AbstractEvaluator
 
 
-class CCAEvaluator(AbstractEvaluator):
+class InfoGraphEvaluator(AbstractEvaluator):
 
     def __init__(self, config):
         self.metrics = config.get('metrics', ['MAE'])  # 评估指标, 是一个 list

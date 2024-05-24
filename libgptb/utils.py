@@ -1,7 +1,6 @@
 from typing import *
 import os
 import torch
-import dgl
 import random
 import numpy as np
 
@@ -87,6 +86,7 @@ def get_logger(config, name=None):
     log_filename = '{}-{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],config.get("ratio",1),
                                             config['config_file'], config['exp_id'], get_local_time())
     logfilepath = os.path.join(log_dir, log_filename)
+
 
     logger = logging.getLogger(name)
 
@@ -268,10 +268,6 @@ def seed_everything(seed):
 def normalize(s):
     return (s.max() - s) / (s.max() - s.mean())
 
-
-def build_dgl_graph(edge_index: torch.Tensor) -> dgl.DGLGraph:
-    row, col = edge_index
-    return dgl.graph((row, col))
 
 
 def batchify_dict(dicts: List[dict], aggr_func=lambda x: x):

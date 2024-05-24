@@ -8,12 +8,11 @@ from logging import getLogger
 from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
-from libgptb.evaluators import get_split, LREvaluator
+from libgptb.evaluators import get_split, SVMEvaluator, RocAucEvaluator
 from functools import partial
-from libgptb.augmentors import EdgeRemovingDGL, FeatureMaskingDGL
 
 
-class GRACEExecutor(AbstractExecutor):
+class InfoGraphExecutor(AbstractExecutor):
     def __init__(self, config, model, data_feature):
         self.evaluator = get_evaluator(config)
         self.config = config
@@ -21,8 +20,6 @@ class GRACEExecutor(AbstractExecutor):
         self.device = self.config.get('device', torch.device('cpu'))
         self.model = model.to(self.device)
         self.exp_id = self.config.get('exp_id', None)
-        self.dfr = self.config.get('dfr', 0.2)
-        self.der = self.config.get('der', 0.2)
 
         self.cache_dir = './libgptb/cache/{}/model_cache'.format(self.exp_id)
         self.evaluate_res_dir = './libgptb/cache/{}/evaluate_cache'.format(self.exp_id)
@@ -44,7 +41,7 @@ class GRACEExecutor(AbstractExecutor):
         self.epochs = self.config.get('max_epoch', 100)
         self.train_loss = self.config.get('train_loss', 'none')
         self.learner = self.config.get('learner', 'adam')
-        self.learning_rate = self.config.get('learning_rate', 0.01)
+        self.learning_rate = self.config.get('learning_rate', 0.001)
         self.weight_decay = self.config.get('weight_decay', 0)
         self.lr_beta1 = self.config.get('lr_beta1', 0.9)
         self.lr_beta2 = self.config.get('lr_beta2', 0.999)
@@ -70,7 +67,8 @@ class GRACEExecutor(AbstractExecutor):
         self.saved = self.config.get('saved_model', True)
         self.load_best_epoch = self.config.get('load_best_epoch', False)
         self.hyper_tune = self.config.get('hyper_tune', False)
-
+        self.downstream_ratio = self.config.get('downstream_ratio', 0.1)
+        self.downstream_task = self.config.get('downstream_task','orignal')
         self.output_dim = self.config.get('output_dim', 1)
         # TODO
         self.optimizer = self._build_optimizer()
@@ -80,6 +78,8 @@ class GRACEExecutor(AbstractExecutor):
         if self._epoch_num > 0:
             self.load_model_with_epoch(self._epoch_num)
         self.loss_func = None
+
+        self.num_samples = self.data_feature.get('num_samples')
 
     def save_model(self, cache_name):
         """
@@ -193,8 +193,8 @@ class GRACEExecutor(AbstractExecutor):
         else:
             lr_scheduler = None
         return lr_scheduler
-
-    def evaluate(self, data):
+    
+    def evaluate(self, dataloader):
         """
         use model to test data
 
@@ -202,20 +202,36 @@ class GRACEExecutor(AbstractExecutor):
             test_dataloader(torch.Dataloader): Dataloader
         """
         self._logger.info('Start evaluating ...')
-        for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
+        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
             self.load_model_with_epoch(epoch_idx)
-            self.model.encoder_model.eval()
-            graph = data
-            feat = graph.ndata['feat']
-            graph = graph.remove_self_loop().add_self_loop().to(self.device)
-            feat = feat.to(self.device)
-            z = self.model.gconv(graph, feat)
-            split = get_split(num_samples=z.size()[0], train_ratio=0.1, test_ratio=0.8, dataset=self.config['dataset'])
-            labels = graph.ndata['label']
+            if self.downstream_task == 'orignal':
+                self.model.encoder_model.eval()
+                x = []
+                y = []
+                for data in dataloader:
+                    data = data.to('cuda')
+                    if data.x is None:
+                        num_nodes = data.batch.size(0)
+                        data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
+                    with torch.no_grad():
+                        z, g = self.model.encoder_model(data.x, data.edge_index, data.batch)
+                        x.append(g)
+                        y.append(data.y)
+                    torch.cuda.empty_cache()
+                x = torch.cat(x, dim=0)
+                y = torch.cat(y, dim=0)
 
-            result = LREvaluator()(z, labels, split)
-            print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
-
+                split = get_split(num_samples=self.num_samples, train_ratio=0.8, test_ratio=0.1,downstream_ratio = self.downstream_ratio, dataset=self.config['dataset'])
+                if self.config['dataset'] == 'ogbg-molhiv': 
+                    result = RocAucEvaluator()(x, y, split)
+                    print(f'(E): Roc-Auc={result["roc_auc"]:.4f}')
+                else:
+                    result = SVMEvaluator()(x, y, split)
+                    print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
+            
+            elif self.downstream_task == 'loss':
+                losses = self._train_epoch(dataloader, epoch_idx, self.loss_func,train = False)
+                result = np.mean(losses) 
 
             self._logger.info('Evaluate result is ' + json.dumps(result))
             filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
@@ -224,7 +240,6 @@ class GRACEExecutor(AbstractExecutor):
             with open(os.path.join(save_path, '{}.json'.format(filename)), 'w') as f:
                 json.dump(result, f)
                 self._logger.info('Evaluate result is saved at ' + os.path.join(save_path, '{}.json'.format(filename)))
-        
 
     def train(self, train_dataloader, eval_dataloader):
         """
@@ -240,27 +255,12 @@ class GRACEExecutor(AbstractExecutor):
         best_epoch = 0
         train_time = []
         eval_time = []
-        # num_batches = len(train_dataloader)
-        # self._logger.info("num_batches:{}".format(num_batches))
-        graph = train_dataloader
-        feat = graph.ndata['feat']
-
-        edgeremove = EdgeRemovingDGL(self.dfr)
-        featmask = FeatureMaskingDGL(self.der)
+        num_batches = len(train_dataloader)
+        self._logger.info("num_batches:{}".format(num_batches))
 
         for epoch_idx in range(self._epoch_num, self.epochs):
             start_time = time.time()
-            graph1 = edgeremove.augment(graph)
-            graph2 = edgeremove.augment(graph)
-            feat1 = featmask.augment(feat)
-            feat2 = featmask.augment(feat)
-
-            graph1 = graph1.add_self_loop().to(self.device)
-            graph2 = graph2.add_self_loop().to(self.device)
-            feat1 = feat1.to(self.device)
-            feat2 = feat2.to(self.device)
-
-            losses = self._train_epoch(graph1, graph2, feat1, feat2, epoch_idx, self.loss_func)
+            losses = self._train_epoch(train_dataloader, epoch_idx, self.loss_func)
             t1 = time.time()
             train_time.append(t1 - start_time)
             self._writer.add_scalar('training loss', np.mean(losses), epoch_idx)
@@ -268,7 +268,7 @@ class GRACEExecutor(AbstractExecutor):
 
             self._logger.info("evaluating now!")
             t2 = time.time()
-            val_loss = np.mean(losses) # self._valid_epoch(eval_dataloader, epoch_idx, self.loss_func)
+            val_loss = np.mean(losses) 
             end_time = time.time()
             eval_time.append(end_time - t2)
 
@@ -284,7 +284,8 @@ class GRACEExecutor(AbstractExecutor):
                     format(epoch_idx, self.epochs, np.mean(losses),  log_lr, (end_time - start_time))
                 self._logger.info(message)
 
-            if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
+            #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
+            if epoch_idx+1 in [3,10,20,40,60,80,100]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)
                 self._logger.info('saving to {}'.format(model_file_name))
 
@@ -310,7 +311,7 @@ class GRACEExecutor(AbstractExecutor):
             self.load_model_with_epoch(best_epoch)
         return min_val_loss
 
-    def _train_epoch(self, graph1, graph2, feat1, feat2, epoch_idx, loss_func=None):
+    def _train_epoch(self, train_dataloader, epoch_idx, loss_func=None, train = True):
         """
         完成模型一个轮次的训练
 
@@ -322,14 +323,25 @@ class GRACEExecutor(AbstractExecutor):
         Returns:
             list: 每个batch的损失的数组
         """
-        # self.model.encoder_model.train()
-        self.model.encoder_model.train()
-        # loss_func = loss_func if loss_func is not None else self.model.calculate_loss
-        self.optimizer.zero_grad()
-        z1, z2 = self.model.encoder_model(graph1, graph2, feat1, feat2)
-        loss = self.model.contrast_model(z1, z2)
-        # loss = loss_func(batch)
-        self._logger.debug(loss.item())
-        loss.backward()
-        self.optimizer.step()
-        return loss.item()
+        if train:
+            self.model.encoder_model.train()
+        else:
+            self.model.encoder_model.eval()
+        epoch_loss = 0
+        for data in train_dataloader:
+            data = data.to('cuda')
+            self.optimizer.zero_grad()
+            if data.x is None:
+                num_nodes = data.batch.size(0)
+                data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
+
+            z, g = self.model.encoder_model(data.x, data.edge_index, data.batch)
+            z, g = self.model.encoder_model.project(z, g)
+            loss = self.model.contrast_model(h=z, g=g, batch=data.batch)
+            # loss = loss_func(batch)
+            self._logger.debug(loss.item())
+            loss.backward()
+            self.optimizer.step()
+
+            epoch_loss += loss.item()
+        return epoch_loss
