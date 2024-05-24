@@ -237,8 +237,8 @@ class MAEExecutor(AbstractExecutor):
                     
                     #print(labels.numpy())
                     #print(out.cpu().numpy)
-                    y_list.append(labels.numpy())
-                    x_list.append(out.cpu().numpy())
+                    y_list.append(labels)
+                    x_list.append(out)
             x = np.concatenate(x_list, axis=0)
             y = np.concatenate(y_list, axis=0)
             print(y)
