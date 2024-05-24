@@ -147,13 +147,9 @@ class MAEExecutor(AbstractExecutor):
             cache_name(str): 保存的文件名
         """
         self._logger.info("Loaded model at " + cache_name)
-        print(1)
         model_state, optimizer_state = torch.load(cache_name)
-        print(1)
         self.model.load_state_dict(model_state)
-        print(1)
         self.optimizer.load_state_dict(optimizer_state)
-        print(1)
     def save_model_with_epoch(self, epoch):
         """
         保存某个epoch的模型
@@ -215,15 +211,12 @@ class MAEExecutor(AbstractExecutor):
             self.model.eval()
             x_list = []
             y_list = []
-            print(len(test_dataloader))
             with torch.no_grad():
                 for i, batch_g in enumerate(test_dataloader):
                    
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
-                    if i%100==0:
-                        print(i)
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
