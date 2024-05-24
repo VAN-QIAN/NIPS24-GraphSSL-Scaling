@@ -196,12 +196,17 @@ class MAEExecutor(AbstractExecutor):
             print(len(test_dataloader))
             with torch.no_grad():
                 for i, batch_g in enumerate(test_dataloader):
-                    if i %100 ==0:
-                        print(i)
+                   
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
+                    if i %100 ==0:
+                        print(i)
+                        print(labels)
                     labels = column_or_1d(labels.numpy(), warn=True).ravel()
+                    if i %100 ==0:
+                        print(i)
+                        print(labels)
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
