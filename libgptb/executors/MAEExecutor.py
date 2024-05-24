@@ -245,8 +245,6 @@ class MAEExecutor(AbstractExecutor):
                             self.config['model'] + '_' + self.config['dataset']
             save_path = self.evaluate_res_dir
             file_path = os.path.join(save_path, '{}.json'.format(filename))
-            if self.config['dataset'] in ["ogbg-ppa"]:
-                break
             if not os.path.exists(file_path):
                 os.makedirs(save_path, exist_ok=True)
             print(filename)
