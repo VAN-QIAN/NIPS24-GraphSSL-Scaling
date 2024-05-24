@@ -54,12 +54,17 @@
         }
     },
     "SSGCL": {
-        "allowed_model": ["MVGRLg"],
-        "allowed_dataset": ["MUTAG", "MCF-7", "MOLT-4","P388","ZINC_full","reddit_threads"],
+        "allowed_model": ["MVGRLg","GraphMAE"],
+        "allowed_dataset": ["reddit_threads","github_stargazers","ogbg-molhiv","ogbg-ppa"],
         "MVGRLg": {
             "dataset_class": "TUDataset",
             "executor": "MVGRLgExecutor",
             "evaluator": "MVGRLgEvaluator"
+        },
+        "GraphMAE": {
+            "dataset_class": "MAEDataset",
+            "executor": "GraphMAEExecutor",
+            "evaluator": "GraphMAEEvaluator"
         }
     }
 }
