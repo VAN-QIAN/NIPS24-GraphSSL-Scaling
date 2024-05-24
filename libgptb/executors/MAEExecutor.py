@@ -20,6 +20,27 @@ from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
 from libgptb.evaluators import get_split, LREvaluator
 
+def evaluate_graph_embeddings_using_svm(embeddings, labels):
+    result = []
+    kf = StratifiedKFold(n_splits=10, shuffle=True, random_state=0)
+
+    for train_index, test_index in kf.split(embeddings, labels):
+        x_train = embeddings[train_index]
+        x_test = embeddings[test_index]
+        y_train = labels[train_index]
+        y_test = labels[test_index]
+        params = {"C": [1e-3, 1e-2, 1e-1, 1, 10]}
+        svc = SVC(random_state=42)
+        clf = GridSearchCV(svc, params)
+        clf.fit(x_train, y_train)
+
+        preds = clf.predict(x_test)
+        f1 = f1_score(y_test, preds, average="micro")
+        result.append(f1)
+    test_f1 = np.mean(result)
+    test_std = np.std(result)
+
+    return test_f1, test_std
 
 
 class MAEExecutor(AbstractExecutor):
@@ -200,13 +221,8 @@ class MAEExecutor(AbstractExecutor):
                     batch_g = batch_g.to(self.device)
                     feat = batch_g.x
                     labels = batch_g.y.cpu()
-                    if i %100 ==0:
+                    if i%100==0:
                         print(i)
-                        print(labels)
-                    labels = column_or_1d(labels.numpy(), warn=True).ravel()
-                    if i %100 ==0:
-                        print(i)
-                        print(labels)
                     out = self.model.embed(feat, batch_g.edge_index)
                     if self.pooler == "mean":
                         out = global_mean_pool(out, batch_g.batch)
@@ -219,10 +235,10 @@ class MAEExecutor(AbstractExecutor):
                     
                     #print(labels.numpy())
                     #print(out.cpu().numpy)
-                    y_list.append(labels)
-                    x_list.append(out)
-            x = torch.cat(x_list, dim=0)
-            y = torch.cat(y_list, dim=0)
+                    y_list.append(labels.numpy())
+                    x_list.append(out.cpu().numpy())
+            x = np.concatenate(x_list, axis=0)
+            y = np.concatenate(y_list, axis=0)
             print(y)
             print("here")
             split = get_split(num_samples=x.shape[0], train_ratio=0.8, test_ratio=0.1,dataset=self.config['dataset'])
@@ -232,10 +248,10 @@ class MAEExecutor(AbstractExecutor):
            
             print("------------------------------")
             print(split)
-            result = SVMEvaluator(linear=True)(x, y, split)
-
+            #result = SVMEvaluator(linear=True)(x, y, split)
+            test_f1, test_std = evaluate_graph_embeddings_using_svm(x, y)
                     
-            self._logger.info('Evaluate result is ' + json.dumps(result))
+            self._logger.info('Evaluate result is macro' + (test_f1+test_std)+'   min_f1    '+(test_f1-test_std) )
             
             self._logger.info('Evaluate result2 is ' + json.dumps(result2))
             filename = 'epoch'+str(epoch_idx)+"_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
