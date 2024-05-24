@@ -301,6 +301,8 @@ class MAEExecutor(AbstractExecutor):
         eval_time = []
         num_batches = len(train_dataloader)
         self._logger.info("num_batches:{}".format(num_batches))
+        if self.config['exp_id']==60997:
+            return
         for epoch_idx in range(self.max_epoch):
             start_time = time.time()
             losses = self._train_epoch(train_dataloader, epoch_idx)
