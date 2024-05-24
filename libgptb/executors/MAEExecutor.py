@@ -64,6 +64,7 @@ class MAEExecutor(AbstractExecutor):
         self.max_epoch_f =config['max_epoch_f']
         self.num_hidden = config['nhid']
         self.num_layers = config['num_layers']
+        self.nclass=self.config.get('num_classes', 2)
         self.encoder_type = config['encoder']
         self.decoder_type = config['decoder']
         self.optim_type = config['optimizer'] 
@@ -250,9 +251,10 @@ class MAEExecutor(AbstractExecutor):
             print("------------------------------")
             print(split)
             #result = SVMEvaluator(linear=True)(x, y, split)
-            test_f1, test_std = evaluate_graph_embeddings_using_svm(x, y)
-                    
-            self._logger.info('Evaluate result is macro' + (test_f1+test_std)+'   min_f1    '+(test_f1-test_std) )
+            #test_f1, test_std = evaluate_graph_embeddings_using_svm(x, y)
+            result=PyTorchEvaluator(n_features=x.shape[1],n_classes=self.nclasses)(x, y, split)
+            self._logger.info('Evaluate result is ' + json.dumps(result))
+            #self._logger.info('Evaluate result is macro' + (test_f1+test_std)+'   min_f1    '+(test_f1-test_std) )
             
             self._logger.info('Evaluate result2 is ' + json.dumps(result2))
             filename = 'epoch'+str(epoch_idx)+"_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
