@@ -301,7 +301,58 @@ class MAEExecutor(AbstractExecutor):
         eval_time = []
         num_batches = len(train_dataloader)
         self._logger.info("num_batches:{}".format(num_batches))
-        if self.config['exp_id']=='60997':
+        if self.config['exp_id']=='38295':
+            self.load_model_with_epoch(79)
+            for epoch_idx in range (20):
+                start_time = time.time()
+                losses = self._train_epoch(train_dataloader, epoch_idx)
+                t1 = time.time()
+                train_time.append(t1 - start_time)
+                self._writer.add_scalar('training loss', np.mean(losses), epoch_idx)
+                self._logger.info("epoch complete!")
+
+                self._logger.info("evaluating now!")
+                t2 = time.time()
+                val_loss = np.mean(losses) 
+                end_time = time.time()
+                eval_time.append(end_time - t2)
+
+                if self.lr_scheduler is not None:
+                    if self.lr_scheduler_type.lower() == 'reducelronplateau':
+                        self.lr_scheduler.step(val_loss)
+                    else:
+                        self.lr_scheduler.step()
+
+                if (epoch_idx % self.log_every) == 0:
+                    log_lr = self.optimizer.param_groups[0]['lr']
+                    message = 'Epoch [{}/{}] train_loss: {:.4f}, lr: {:.6f}, {:.2f}s'.\
+                        format(epoch_idx, self.max_epoch, np.mean(losses),  log_lr, (end_time - start_time))
+                    self._logger.info(message)
+                """
+                if epoch_idx+1 in [1] and self.config['dataset'] in ["ogbg-ppa"]:
+                    model_file_name = self.save_model_with_epoch(epoch_idx)
+                    self._logger.info('saving to {}'.format(model_file_name))
+                    break
+                """
+            #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
+                if epoch_idx+1 in [20]:
+                    model_file_name = self.save_model_with_epoch(epoch_idx+80)
+                    self._logger.info('saving to {}'.format(model_file_name))
+
+                if val_loss < min_val_loss:
+                    wait = 0
+                    if self.saved:
+                        model_file_name = self.save_model_with_epoch(epoch_idx)
+                        self._logger.info('Val loss decrease from {:.4f} to {:.4f}, '
+                                      'saving to {}'.format(min_val_loss, val_loss, model_file_name))
+                    min_val_loss = val_loss
+                    best_epoch = epoch_idx
+                else:
+                    wait += 1
+                    if wait == self.patience and self.use_early_stop:
+                        self._logger.warning('Early stopping at epoch: %d' % epoch_idx)
+                        break
+
             return
         for epoch_idx in range(self.max_epoch):
             start_time = time.time()
