@@ -62,6 +62,14 @@ class GraphMAEExecutor(AbstractExecutor):
         self.lr_decay = self.config.get('lr_decay', True)
         self.lr_decay_ratio = self.config.get('lr_decay_ratio', 0.1)
         self.lr_scheduler_type = self.config.get('lr_scheduler', 'multisteplr')
+        
+        self._logger.info(self.model)
+        for name, param in self.model.named_parameters():
+            self._logger.info(str(name) + '\t' + str(param.shape) + '\t' +
+                              str(param.device) + '\t' + str(param.requires_grad))
+        total_num = sum([param.nelement() for param in self.model.parameters()])
+        self._logger.info('Total parameter numbers: {}'.format(total_num))
+        
         self.optimizer = self._build_optimizer()
         # TODO
         self.lr_scheduler = self._build_lr_scheduler()
