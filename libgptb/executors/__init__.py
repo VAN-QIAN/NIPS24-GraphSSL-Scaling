@@ -8,7 +8,10 @@ from libgptb.executors.GRACE_executor import GRACEExecutor
 from libgptb.executors.MVGRL_executor import MVGRLExecutor
 from libgptb.executors.COSTA_executor import COSTAExecutor
 from libgptb.executors.HomoGCL_executor import HomoGCLExecutor
+from libgptb.executors.GIN_executor import GINExecutor
+from libgptb.executors.GraphCL_executor import GraphCLExecutor
 from libgptb.executors.MVGRLg_executor import MVGRLgExecutor
+from libgptb.executors.MAEExecutor import MAEExecutor
 
 __all__ = [
     "DGIExecutor",
@@ -21,6 +24,8 @@ __all__ = [
     "MVGRLExecutor",
     "COSTAExecutor",
     "HomoGCLExecutor",
-    "MVGRLgExecutor"
-
+    "GINExecutor",
+    "GraphCLExecutor",
+    "MVGRLgExecutor",
+    "MAEExecutor"
 ]

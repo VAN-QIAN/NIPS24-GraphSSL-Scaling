@@ -22,7 +22,10 @@ class TUDataset(AbstractDataset):
         
         self._load_data()
         self.ratio = self.config.get('ratio', 0)
-
+        config['num_feature']={
+            "input_dim": max(self.dataset.num_features, 1)
+        }
+        
     def _load_data(self):
         device = torch.device('cuda')
         path = osp.join(os.getcwd(), 'raw_data')
@@ -32,7 +35,12 @@ class TUDataset(AbstractDataset):
         if self.datasetName in ["MUTAG", "MCF-7", "MOLT-4","P388","ZINC_full","reddit_threads"]:   
             tu_dataset = getattr(importlib.import_module('torch_geometric.datasets'), 'TUDataset')
         self.dataset = tu_dataset(path, name=self.datasetName, transform=T.NormalizeFeatures())
+        labels = torch.tensor([x.y for x in self.dataset])
     
+        self.num_classes = torch.max(labels).item() + 1
+        
+        feature_dim = int(self.dataset[0].num_features)
+        
     def get_data(self):
         
         assert self.train_ratio + self.test_ratio + self.test_ratio <= 1

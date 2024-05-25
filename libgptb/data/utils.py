@@ -17,6 +17,7 @@ def get_dataset(config):
     Returns:
         AbstractDataset: the loaded dataset
     """
+
     try:
         return getattr(importlib.import_module('libgptb.data.dataset'),
                        config['dataset_class'])(config)
