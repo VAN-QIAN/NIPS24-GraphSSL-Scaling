@@ -1,6 +1,6 @@
 models=("GraphMAE")
 datasets=("ogbg-ppa")
-ratio=("0.1" "0.2" "0.3" "0.4" "0.5" "0.6" "0.7" "0.8" "0.9" "1")
+ratio=("0.2" "0.3" "0.4" "0.5" )
 for model in "${models[@]}"; do
     for dataset in "${datasets[@]}"; do
         for i in "${ratio[@]}"; do
