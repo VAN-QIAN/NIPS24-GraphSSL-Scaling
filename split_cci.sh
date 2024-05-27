@@ -10,7 +10,7 @@ commands=()
 
 for model in "${models[@]}"; do
     for dataset in "${datasets[@]}"; do
-        for i in $(seq $ratio $ratio 1); do
+        for i in "${ratio[@]}"; do
             command="${template/MODEL_PLACEHOLDER/$model}"
             command="${command/DATASET_PLACEHOLDER/$dataset}"
             command="${command/RATIO_PLACEHOLDER/$i}"
