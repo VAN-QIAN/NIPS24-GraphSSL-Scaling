@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --partition=el8
 #SBATCH --gres=gpu:1
-#SBATCH --time=08:00:00
+#SBATCH --time=06:00:00
 #SBATCH --output=%x/%x_%j.log
 #SBATCH --error=%x/%x_%j.err
 
