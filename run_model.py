@@ -12,7 +12,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # 增加指定的参数
     parser.add_argument('--task', type=str,
-                        default='GCL', help='the name of task')
+                        default='SSGCL', help='the name of task')
     parser.add_argument('--model', type=str,
                         default='DGI', help='the name of model')
     parser.add_argument('--dataset', type=str,

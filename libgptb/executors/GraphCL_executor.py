@@ -322,7 +322,7 @@ class GraphCLExecutor(AbstractExecutor):
                 data.x = torch.ones((num_nodes, 1), dtype=torch.float32, device=data.batch.device)
 
             _, _, _, _, g1, g2 = self.model.encoder_model(data.x, data.edge_index, data.batch)
-            g1, g2 = [self.model.encoder_model.encoder.project(g) for g in [g1, g2]]
+            # g1, g2 = [self.model.encoder_model.encoder.project(g) for g in [g1, g2]]
             loss = self.model.contrast_model(g1=g1, g2=g2, batch=data.batch)
             loss.backward()
             self.optimizer.step()
