@@ -1,0 +1,6 @@
+2024-05-24 08:51:05,071 - INFO - Log directory: ~/scratch/log
+2024-05-24 08:51:05,076 - INFO - Begin pipeline, config_file=None, model_name=GraphCL, dataset_name=ogbg-ppa, exp_id=59827
+2024-05-24 08:51:05,076 - INFO - {'task': 'SSGCL', 'model': 'GraphCL', 'dataset': 'ogbg-ppa', 'saved_model': False, 'train': True, 'seed': 0, 'ratio': 0.1, 'downstream_ratio': 0.1, 'downstream_task': 'original', 'gpu_id': 0, 'dataset_class': 'PyGDataset', 'executor': 'GraphCLExecutor', 'evaluator': 'GraphCLEvaluator', 'gpu': True, 'num_layers': 2, 'hidden_dim': 32, 'prior': 'False', 'epochs': 100, 'log_interval': 10, 'batch_size': 128, 'learning_rate': 0.01, 'aug': 'dnodes', 'local': 'True', 'train_loss': 'none', 'epoch': 0, 'learner': 'adam', 'lr_decay': False, 'log_level': 'INFO', 'log_every': 1, 'load_best_epoch': False, 'hyper_tune': False, 'train_ratio': 0.8, 'valid_ratio': 0.1, 'test_ratio': 0.1, 'device': device(type='cuda', index=0), 'exp_id': 59827}
+2024-05-24 08:51:06,196 - INFO - Note: detected 160 virtual cores but NumExpr set to maximum of 64, check "NUMEXPR_MAX_THREADS" environment variable.
+2024-05-24 08:51:06,196 - INFO - Note: NumExpr detected 160 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2024-05-24 08:51:06,197 - INFO - NumExpr defaulting to 8 threads.

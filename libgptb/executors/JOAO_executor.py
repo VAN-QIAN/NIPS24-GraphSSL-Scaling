@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
 from functools import partial
-from libgptb.evaluators import get_split,SVMEvaluator
+from libgptb.evaluators import get_split,SVMEvaluator,RocAucEvaluator,PyTorchEvaluator
 from libgptb.models import DualBranchContrast
 from sklearn import preprocessing
 
@@ -228,8 +228,17 @@ class JOAOExecutor(AbstractExecutor):
                     y = torch.cat(y, dim=0)
 
                     split = get_split(num_samples=x.size()[0], train_ratio=0.8, test_ratio=0.1,dataset=self.dataset)
-                    result = SVMEvaluator(linear=True)(x, y, split)
-                    self._logger.info(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
+                    if self.config['dataset'] == 'ogbg-molhiv': 
+                        result = RocAucEvaluator()(x, y, split)
+                        self._logger.info(f'(E): Roc-Auc={result["roc_auc"]:.4f}')
+                    elif self.config['dataset'] == 'ogbg-ppa':
+                        unique_classes = torch.unique(y)
+                        nclasses = unique_classes.size(0)
+                        result = PyTorchEvaluator(n_features=x.shape[1],n_classes=nclasses)(x, y, split)
+                        self._logger.info(f'(E): Acc={result["accuracy"]:.4f}')
+                    else:
+                        result = SVMEvaluator(linear=True)(x, y, split)
+                        self._logger.info(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
                 elif self.downstream_task == 'loss':
                     losses = self._train_epoch(test_dataloader,epoch_idx, self.loss_func,train = False)
                     result = np.mean(losses) 
@@ -331,12 +340,12 @@ class JOAOExecutor(AbstractExecutor):
             epoch_loss += loss.item()
 
         #minimax 
-        loss_aug = np.zeros(5)
-        for n in range(5):
-            _aug_P = np.zeros(5)
+        loss_aug = np.zeros(4)
+        for n in range(4):
+            _aug_P = np.zeros(4)
             _aug_P[n] = 1
             dataset_aug_P = _aug_P
-            count, count_stop = 0, len(train_dataloader)//5+1
+            count, count_stop = 0, len(train_dataloader)//4+1
             with torch.no_grad():
                  for data in train_dataloader:
                     data = data.to(self.device)
@@ -361,9 +370,9 @@ class JOAOExecutor(AbstractExecutor):
 
         gamma = float(self.gamma)
         beta = 1
-        b = self.model.aug_P + beta * (loss_aug - gamma * (self.model.aug_P - 1/5))
+        b = self.model.aug_P + beta * (loss_aug - gamma * (self.model.aug_P - 1/4))
 
-        mu_min, mu_max = b.min()-1/5, b.max()-1/5
+        mu_min, mu_max = b.min()-1/4, b.max()-1/4
         mu = (mu_min + mu_max) / 2
         # bisection method
         while abs(np.maximum(b-mu, 0).sum() - 1) > 1e-2:

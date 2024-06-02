@@ -79,7 +79,7 @@ def get_logger(config, name=None):
     Returns:
         Logger: logger
     """
-    log_dir = './libgptb/log/revised_result/GraphCL'
+    log_dir = '/scratch/log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
@@ -87,8 +87,8 @@ def get_logger(config, name=None):
         log_filename = '{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
                                                 config['config_file'], config['exp_id'], get_local_time())
     elif config['task'] == 'SSGCL':
-        log_filename = '{}-{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
-                                                config['epochs'],config['ratio'], config['exp_id'], get_local_time())
+        log_filename = '{}-{}-{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
+                                                config['ratio'],config['num_layers'],config['hidden_dim'], config['exp_id'], get_local_time())
     else:
       log_filename = '{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
                                                  config['exp_id'], get_local_time())

@@ -76,7 +76,7 @@ class JOAO(AbstractGCLModel):
         self.hidden_dim=config.get("hidden_dim",32)
         self.num_features=data_feature.get("num_features",1)
         super().__init__(config, data_feature)
-        self.aug_P= np.ones(5) / 5
+        self.aug_P= np.ones(4) / 4
         self.aug1 = A.Identity()
         self._update_aug2()
         
@@ -88,7 +88,6 @@ class JOAO(AbstractGCLModel):
         """ Initialize aug2 with the current aug_P values. """
         self.aug2 = A.RandomChoiceWithProb(
             augmentors=[
-                A.RWSampling(num_seeds=1000, walk_length=10),
                 A.NodeDropping(pn=0.1),
                 A.FeatureMasking(pf=0.1),
                 A.EdgeRemoving(pe=0.1),

@@ -28,4 +28,5 @@ __pycache__/
 /reddit_threads
 /github_stargazers
 /slurm_logs
-
+/logs
+~/scratch/log
