@@ -76,7 +76,7 @@ class GraphCL(AbstractGCLModel):
         self.num_features=data_feature.get("num_features",1)
         super().__init__(config, data_feature)
         aug1 = A.Identity()
-        aug2 = A.RandomChoice([A.RWSampling(num_seeds=1000, walk_length=10),
+        aug2 = A.RandomChoice([
                             A.NodeDropping(pn=0.1),
                             A.FeatureMasking(pf=0.1),
                             A.EdgeRemoving(pe=0.1)], 1)

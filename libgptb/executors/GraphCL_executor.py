@@ -79,7 +79,7 @@ class GraphCLExecutor(AbstractExecutor):
         self.num_layers = self.config.get('num_layers')
         self.num_classes = self.config.get('num_class')
         self.label_dim = data_feature.get('label_dim')
-        self.downstream_task=config.get("downstream_task","original")
+        self.downstream_task=config.get("downstream_task","both")
         self.train_ratio = self.config.get("train_ratio",0.8)
         self.valid_ratio = self.config.get("valid_ratio",0.1)
         self.test_ratio = self.config.get("test_ratio",0.1)
@@ -209,11 +209,11 @@ class GraphCLExecutor(AbstractExecutor):
         """
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
-        for epoch_idx in [3-1,10-1,20-1,40-1,60-1,80-1,100-1]:
+        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
                 if epoch_idx+1 > self.epochs:
                     break
                 self.load_model_with_epoch(epoch_idx)
-                if self.downstream_task == 'original':
+                if self.downstream_task == 'original' or self.downstream_task == 'both':
                     self.model.encoder_model.eval()
                     x = []
                     y = []
@@ -250,9 +250,10 @@ class GraphCLExecutor(AbstractExecutor):
                         result = SVMEvaluator(linear=True)(x, y, split)
                         self._logger.info(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
 
-                elif self.downstream_task == 'loss':
+                if self.downstream_task == 'loss' or self.downstream_task == 'both':
                     losses = self._train_epoch(test_dataloader["test"],epoch_idx, self.loss_func,train = False)
                     result = np.mean(losses) 
+                    self._logger.info('Evaluate loss is ' + json.dumps(result))
                 elif self.downstream_task == 'logits':
                     logits = Logits_GraphCL(self.config, self.model, self._logger)
                     self._logger.info("-----Start Downstream Fine Tuning-----")

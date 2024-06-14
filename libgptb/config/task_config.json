@@ -91,16 +91,6 @@
             "dataset_class": "MAEDataset",
             "executor": "GraphMAEExecutor",
             "evaluator": "GraphMAEEvaluator"
-        },
-        "InfoGraph": {
-            "dataset_class": "PyGDataset",
-            "executor": "InfoGraphExecutor",
-            "evaluator": "InfoGraphEvaluator"
-        },
-        "GraphMAE": {
-            "dataset_class": "MAEDataset",
-            "executor": "GraphMAEExecutor",
-            "evaluator": "GraphMAEEvaluator"
         }
     }
 }
