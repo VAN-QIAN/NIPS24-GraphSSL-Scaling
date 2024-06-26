@@ -8,7 +8,7 @@ from logging import getLogger
 from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
-from libgptb.evaluators import get_split, SVMEvaluator, RocAucEvaluator, PyTorchEvaluator, Logits_InfoGraph
+from libgptb.evaluators import get_split, SVMEvaluator, RocAucEvaluator, PyTorchEvaluator, Logits_InfoGraph, APEvaluator
 from functools import partial
 
 
@@ -70,6 +70,10 @@ class InfoGraphExecutor(AbstractExecutor):
         self.downstream_ratio = self.config.get('downstream_ratio', 0.1)
         self.downstream_task = self.config.get('downstream_task','original')
         self.output_dim = self.config.get('output_dim', 1)
+        self.hidden_dim = self.config.get('nhid')
+        self.num_layers = self.config.get('layers')
+        self.num_classes = self.config.get('num_class')
+        self.label_dim = data_feature.get('label_dim')
         # TODO
         self.optimizer = self._build_optimizer()
         # TODO
@@ -204,7 +208,8 @@ class InfoGraphExecutor(AbstractExecutor):
             test_dataloader(torch.Dataloader): Dataloader
         """
         self._logger.info('Start evaluating ...')
-        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+        #for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+        for epoch_idx in [100-1,120-1,140-1,160-1,180-1,200-1]:
             self.load_model_with_epoch(epoch_idx)
             if self.downstream_task == 'original' or self.downstream_task == 'both':
                 self.model.encoder_model.eval()
@@ -232,6 +237,9 @@ class InfoGraphExecutor(AbstractExecutor):
                     #nclasses = unique_classes.size(0)
                     self._logger.info('nclasses is {}'.format(self.num_class))
                     result = PyTorchEvaluator(n_features=x.shape[1],n_classes=self.num_class)(x, y, split)
+                elif self.config['dataset'] == 'ogbg-molpcba':
+                    result = APEvaluator(self.hidden_dim*self.num_layers, self.label_dim)(x, y, split)
+                    self._logger.info(f'(E): ap={result["ap"]:.4f}')
                 else:
                     result = SVMEvaluator()(x, y, split)
                     print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
@@ -245,7 +253,7 @@ class InfoGraphExecutor(AbstractExecutor):
             if self.downstream_task == 'logits':
                 logits = Logits_InfoGraph(self.config, self.model, self._logger)
                 self._logger.info("-----Start Downstream Fine Tuning-----")
-                logits.train(dataloader['downstream_train'],dataloader['valid'])
+                logits.train(dataloader['downstream_train'])
                 self._logger.info("-----Fine Tuning Done, Start Eval-----")
                 result = logits.eval(dataloader['test'])
                 self._logger.info('Evaluate acc is ' + json.dumps(result))
@@ -301,7 +309,7 @@ class InfoGraphExecutor(AbstractExecutor):
                 self._logger.info(message)
 
             #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
-            if epoch_idx+1 in [10,20,40,60,80,100]:
+            if epoch_idx+1 in [10,20,40,60,80,100,120,140,160,180,200]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)
                 self._logger.info('saving to {}'.format(model_file_name))
 
@@ -352,6 +360,8 @@ class InfoGraphExecutor(AbstractExecutor):
                 z, g = self.model.encoder_model(data.x, data.edge_index, data.batch)
                 z, g = self.model.encoder_model.project(z, g)
                 loss = self.model.contrast_model(h=z, g=g, batch=data.batch)
+                # loss = loss_func(batch)
+                # print(loss.item())
                 self._logger.debug(loss.item())
                 loss.backward()
                 self.optimizer.step()
@@ -370,20 +380,24 @@ class InfoGraphExecutor(AbstractExecutor):
                 z, g = self.model.encoder_model(data.x, data.edge_index, data.batch)
                 z, g = self.model.encoder_model.project(z, g)
                 loss = self.model.contrast_model(h=z, g=g, batch=data.batch)
+                # loss = loss_func(batch)
+                # print(loss.item())
                 self._logger.debug(loss.item())
                 # 记录更新前的参数
                 original_parameters = {name: param.clone() for name, param in self.model.named_parameters()}
 
                 # 参数更新
-                # loss.backward()
+                loss.backward()
                 #print(loss.item())
                 # self.optimizer.step() # we can not use optimizer to further optimize the model here
 
                 # 比较参数更新前后的差异
-                # for name, param in self.model.named_parameters():
-                #     original_param = original_parameters[name]
-                #     if not torch.equal(original_param, param):
-                #         print(f"Parameter {name} has changed.")
+                for name, param in self.model.named_parameters():
+                    original_param = original_parameters[name]
+                    if not torch.equal(original_param, param):
+                        print(f"Parameter {name} has changed.")
+                    # else:
+                    #     print(f"Parameter {name} has not changed.")
 
                 epoch_loss += loss.item()
         return epoch_loss

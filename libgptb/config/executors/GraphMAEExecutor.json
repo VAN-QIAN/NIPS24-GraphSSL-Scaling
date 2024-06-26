@@ -1,11 +1,10 @@
 {
     "gpu": true,
-    "gpu_id": 0,
     "max_epoch": 100,
     "train_loss": "none",
     "epoch": 0,
     "learner": "adam",
-    "learning_rate": 0.001,
+    "learning_rate": 0.00015,
     "lr_decay": false,
     "log_level": "INFO",
     "log_every": 1,

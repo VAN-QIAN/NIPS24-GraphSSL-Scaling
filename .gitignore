@@ -6,3 +6,12 @@ __pycache__/
 /libgptb/losses/*/__pycache__
 /libgptb/log
 /raw_data
+/config_data
+/config_model
+/data_scaling_log
+/data_scaling_log_
+/data_scaling_log_MAE
+/model_scaling_log
+/model_scaling_log_info200
+/*.sh
+/Info-ogbg-molpcba/

@@ -210,14 +210,13 @@ class GraphMAEExecutor(AbstractExecutor):
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
-            if epoch_idx+1 > self.epochs:
-                break
+            self.load_model_with_epoch(epoch_idx)
             if self.downstream_task == 'original' or self.downstream_task == 'both':
                 self.model.eval()
                 x_list = []
                 y_list = []
                 with torch.no_grad():
-                    for i, batch_g in enumerate(dataloader['original']):
+                    for i, batch_g in enumerate(dataloader['full']):
                         batch_g = batch_g.to(self.device)
                         feat = batch_g.x
                         labels = batch_g.y.cpu()
@@ -248,7 +247,7 @@ class GraphMAEExecutor(AbstractExecutor):
                 self._logger.info('Evaluate result is ' + json.dumps(result))
                 
             if self.downstream_task == 'loss' or self.downstream_task == 'both':
-                losses = self._train_epoch(dataloader['loss'], epoch_idx, self.loss_func,train = False)
+                losses = self._train_epoch(dataloader['test'], epoch_idx, self.loss_func,train = False)
                 result = np.mean(losses) 
                 self._logger.info('Evaluate loss is ' + json.dumps(result))
 

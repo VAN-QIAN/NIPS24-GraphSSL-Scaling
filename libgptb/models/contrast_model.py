@@ -56,7 +56,7 @@ class DualBranchContrast(torch.nn.Module):
             anchor2, sample2, pos_mask2, neg_mask2 = self.sampler(anchor=g2, sample=g1)
         else:  # global-to-local
             if batch is None or batch.max().item() + 1 <= 1:  # single graph
-                assert all(v is not None for v in [h1, h2, g1, g2, h3, h4])
+                # assert all(v is not None for v in [h1, h2, g1, g2, h3, h4])
                 anchor1, sample1, pos_mask1, neg_mask1 = self.sampler(anchor=g1, sample=h2, neg_sample=h4)
                 anchor2, sample2, pos_mask2, neg_mask2 = self.sampler(anchor=g2, sample=h1, neg_sample=h3)
             else:  # multiple graphs

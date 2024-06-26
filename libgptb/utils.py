@@ -80,19 +80,12 @@ def get_logger(config, name=None):
     Returns:
         Logger: logger
     """
-    log_dir = './libgptb/log/revised_result/GraphCL'
+    log_dir = './libgptb/log'
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-
-    if config['task']=="GCL":
-        log_filename = '{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
-                                                config['config_file'], config['exp_id'], get_local_time())
-    elif config['task'] == 'SSGCL':
-        log_filename = '{}-{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
-                                                config['epochs'],config['ratio'], config['exp_id'], get_local_time())
-    else:
-      log_filename = '{}-{}-{}-{}.log'.format(config['model'],config['dataset'],
-                                                 config['exp_id'], get_local_time())
+    print(config.config)
+    log_filename = '{}-{}-{}-{}-{}-{}.log'.format(config['model'],config['dataset'],config.get("ratio",1),
+                                            config['config_file'], config['exp_id'], get_local_time())
 
     logfilepath = os.path.join(log_dir, log_filename)
 

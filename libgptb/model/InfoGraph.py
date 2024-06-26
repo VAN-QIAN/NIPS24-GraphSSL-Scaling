@@ -77,6 +77,7 @@ class InfoGraph(AbstractGCLModel):
         self.nhid = config.get('nhid', 32)
         self.layers = config.get('layers', 2)
         self.device = config.get('device', torch.device('cpu'))
+        self.loss_type = config.get('loss_type', 'JSD')
         self.input_dim = data_feature.get('input_dim', 2)
         super().__init__(config, data_feature)
 
@@ -85,4 +86,8 @@ class InfoGraph(AbstractGCLModel):
         fc2 = FC(hidden_dim=self.nhid * self.layers)
 
         self.encoder_model = Encoder(encoder=gconv, local_fc=fc1, global_fc=fc2).to(self.device)
-        self.contrast_model = SingleBranchContrast(loss=L.JSD(), mode='G2L').to(self.device)
+        if self.loss_type == 'JSD':
+            self.contrast_model = SingleBranchContrast(loss=L.DebiasedJSD(), mode='G2L').to(self.device) # L.JSD() for JSD loss
+        elif self.loss_type == 'InfoNCE':
+            print('Using InfoNCE loss')
+            self.contrast_model = SingleBranchContrast(loss=L.InfoNCE(tau=0.2), mode='G2L').to(self.device) # L.InfoNCE() for InfoNCE loss

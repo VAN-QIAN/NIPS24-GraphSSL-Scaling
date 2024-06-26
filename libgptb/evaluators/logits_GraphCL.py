@@ -6,6 +6,12 @@ from libgptb.evaluators.base_logits_evaluator import BaseLogitsEvaluator
 class Logits_GraphCL(BaseLogitsEvaluator):
     def __init__(self, config, model, logger):
         super().__init__(config, model, logger)
+        # seed = 0
+        # random.seed(seed)
+        # np.random.seed(seed)
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed_all(seed)
+        # torch.backends.cudnn.deterministic = True
         self.layers = self.config.get("num_layers",2)
         self.nhid = self.config.get("hidden_dim",32)
         self.answering =  torch.nn.Sequential(torch.nn.Linear( self.nhid*self.layers, self.num_class),

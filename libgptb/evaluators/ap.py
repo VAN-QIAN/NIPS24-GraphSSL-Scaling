@@ -10,6 +10,12 @@ from ogb.graphproppred import PygGraphPropPredDataset, Evaluator
 class MultiLabelClassifier(nn.Module):
     def __init__(self, n_features, n_label):
         super(MultiLabelClassifier, self).__init__()
+        # seed = 0
+        # random.seed(seed)
+        # np.random.seed(seed)
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed_all(seed)
+        # torch.backends.cudnn.deterministic = True
         self.fc = nn.Linear(n_features, n_label) 
 
     def forward(self, x):

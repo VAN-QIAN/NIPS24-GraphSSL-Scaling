@@ -53,17 +53,6 @@
             "evaluator": "HomoGCLEvaluator"
         }
     },
-
-    "SGC":{
-        "allowed_model":["GIN"],
-        "allowed_dataset":["ogbg-molhiv","ogbg-ppa"],
-        "GIN": {
-            "dataset_class": "SGCDataset",
-            "executor": "GINExecutor",
-            "evaluator": "GINEvaluator"
-        }
-        
-    },
     "SSGCL": {
         "allowed_model": ["MVGRLg","GraphCL","JOAO","GraphMAE","InfoGraph"],
         "allowed_dataset": ["MUTAG","reddit_threads","github_stargazers","ogbg-molhiv", "ogbg-ppa", "ogbg-molpcba"],

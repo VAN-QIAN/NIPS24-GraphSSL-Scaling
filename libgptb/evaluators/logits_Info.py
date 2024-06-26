@@ -5,6 +5,12 @@ from libgptb.evaluators.base_logits_evaluator import BaseLogitsEvaluator
 
 class Logits_InfoGraph(BaseLogitsEvaluator):
     def __init__(self, config, model, logger):
+        # seed = 0
+        # random.seed(seed)
+        # np.random.seed(seed)
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed_all(seed)
+        # torch.backends.cudnn.deterministic = True
         super().__init__(config, model, logger)
         self.pooler = self.config.get('pooling','mean')
 

@@ -10,7 +10,13 @@ from libgptb.evaluators.base_evaluator import BaseEvaluator
 class LogisticRegression(nn.Module):
     def __init__(self, num_features, num_classes):
         super(LogisticRegression, self).__init__()
-        self.fc = nn.Linear(num_features, num_classes)
+        # seed = 0
+        # random.seed(seed)
+        # np.random.seed(seed)
+        # torch.manual_seed(seed)
+        # torch.cuda.manual_seed_all(seed)
+        # torch.backends.cudnn.deterministic = True
+        # self.fc = nn.Linear(num_features, num_classes)
         torch.nn.init.xavier_uniform_(self.fc.weight.data)
 
     def forward(self, x):

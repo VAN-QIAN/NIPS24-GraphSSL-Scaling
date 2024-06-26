@@ -59,7 +59,7 @@ class CrossScaleSampler(Sampler):
             pos_mask = torch.cat([pos_mask1, pos_mask0], dim=1)     # M * 2N
             sample = torch.cat([sample, neg_sample], dim=0)         # 2N * K
         else:
-            assert batch is not None
+            #assert batch is not None
             if use_gpu:
                 ones = torch.eye(num_nodes, dtype=torch.float32, device=device)     # N * N
                 pos_mask = scatter(ones, batch, dim=0, reduce='sum')                # M * N

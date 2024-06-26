@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
 from functools import partial
-from libgptb.evaluators import get_split,SVMEvaluator,RocAucEvaluator,PyTorchEvaluator
+from libgptb.evaluators import get_split,SVMEvaluator,RocAucEvaluator,PyTorchEvaluator,Logits_GraphCL,APEvaluator
 from libgptb.models import DualBranchContrast
 from sklearn import preprocessing
 
@@ -74,7 +74,10 @@ class JOAOExecutor(AbstractExecutor):
         self.local=self.config.get("local")=="True"
         self.prior=self.config.get("prior")=="True"
         self.DS=self.config.get("DS","MUTAG")
-        self.num_layers=model.num_layers
+        self.hidden_dim = self.config.get('hidden_dim')
+        self.num_layers = self.config.get('num_layers')
+        self.num_classes = self.config.get('num_class')
+        self.label_dim = data_feature.get('label_dim')
         self.downstream_task=config.get("downstream_task","original")
         self.train_ratio = self.config.get("train_ratio",0.8)
         self.valid_ratio = self.config.get("valid_ratio",0.1)
@@ -211,11 +214,11 @@ class JOAOExecutor(AbstractExecutor):
                 if epoch_idx+1 > self.epochs:
                     break
                 self.load_model_with_epoch(epoch_idx)
-                if self.downstream_task == 'original':
+                if self.downstream_task == 'original' or self.downstream_task == 'both':
                     self.model.encoder_model.eval()
                     x = []
                     y = []
-                    for data in test_dataloader:
+                    for data in test_dataloader["full"]:
                         data = data.to(self.device)
                         if data.x is None:
                             num_nodes = data.batch.size(0)
@@ -236,11 +239,14 @@ class JOAOExecutor(AbstractExecutor):
                         nclasses = unique_classes.size(0)
                         result = PyTorchEvaluator(n_features=x.shape[1],n_classes=nclasses)(x, y, split)
                         self._logger.info(f'(E): Acc={result["accuracy"]:.4f}')
+                    elif self.config['dataset'] == 'ogbg-molpcba':
+                        result = APEvaluator(self.hidden_dim*self.num_layers, self.label_dim)(x, y, split)
+                        self._logger.info(f'(E): ap={result["ap"]:.4f}')
                     else:
                         result = SVMEvaluator(linear=True)(x, y, split)
                         self._logger.info(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
-                elif self.downstream_task == 'loss':
-                    losses = self._train_epoch(test_dataloader,epoch_idx, self.loss_func,train = False)
+                if self.downstream_task == 'loss' or self.downstream_task == 'both':
+                    losses = self._train_epoch(test_dataloader["test"],epoch_idx, self.loss_func,train = False)
                     result = np.mean(losses) 
                     
                 self._logger.info('Evaluate result is ' + json.dumps(result))
@@ -339,12 +345,12 @@ class JOAOExecutor(AbstractExecutor):
             epoch_loss += loss.item()
 
         #minimax 
-        loss_aug = np.zeros(5)
-        for n in range(5):
-            _aug_P = np.zeros(5)
+        loss_aug = np.zeros(4)
+        for n in range(4):
+            _aug_P = np.zeros(4)
             _aug_P[n] = 1
             dataset_aug_P = _aug_P
-            count, count_stop = 0, len(train_dataloader)//5+1
+            count, count_stop = 0, len(train_dataloader)//4+1
             with torch.no_grad():
                  for data in train_dataloader:
                     data = data.to(self.device)
@@ -371,7 +377,7 @@ class JOAOExecutor(AbstractExecutor):
         beta = 1
         b = self.model.aug_P + beta * (loss_aug - gamma * (self.model.aug_P - 1/5))
 
-        mu_min, mu_max = b.min()-1/5, b.max()-1/5
+        mu_min, mu_max = b.min()-1/4, b.max()-1/4
         mu = (mu_min + mu_max) / 2
         # bisection method
         while abs(np.maximum(b-mu, 0).sum() - 1) > 1e-2:

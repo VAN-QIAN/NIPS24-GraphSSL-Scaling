@@ -5,7 +5,7 @@ from libgptb.losses.abstract_losses import Loss
 
 
 class JSD(Loss):
-    def __init__(self, discriminator=lambda x, y: x @ y.t()):
+    def __init__(self, discriminator=lambda x, y: (x @ y.t())):
         super(JSD, self).__init__()
         self.discriminator = discriminator
 
