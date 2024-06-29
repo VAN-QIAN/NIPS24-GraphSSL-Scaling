@@ -209,8 +209,8 @@ class JOAOExecutor(AbstractExecutor):
             test_dataloader(torch.Dataloader): Dataloader
         """
         self._logger.info('Start evaluating ...')
-        #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
-        for epoch_idx in [3-1,10-1,20-1,40-1,60-1,80-1,100-1]:
+        #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]: 3-1,10-1,20-1,40-1,60-1,80-1,
+        for epoch_idx in [100-1]:
                 if epoch_idx+1 > self.epochs:
                     break
                 self.load_model_with_epoch(epoch_idx)
@@ -248,8 +248,9 @@ class JOAOExecutor(AbstractExecutor):
                 if self.downstream_task == 'loss' or self.downstream_task == 'both':
                     losses = self._train_epoch(test_dataloader["test"],epoch_idx, self.loss_func,train = False)
                     result = np.mean(losses) 
+                    self._logger.info('Evaluate loss is ' + json.dumps(result))
                     
-                self._logger.info('Evaluate result is ' + json.dumps(result))
+                
                 filename = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S') + '_' + \
                             self.config['model'] + '_' + self.config['dataset']
                 save_path = self.evaluate_res_dir

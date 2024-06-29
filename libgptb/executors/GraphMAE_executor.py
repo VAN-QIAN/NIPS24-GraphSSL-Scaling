@@ -16,7 +16,7 @@ from sklearn.model_selection import StratifiedKFold, GridSearchCV
 from torch.utils.tensorboard import SummaryWriter
 from libgptb.executors.abstract_executor import AbstractExecutor
 from libgptb.utils import get_evaluator, ensure_dir
-from libgptb.evaluators import get_split, LREvaluator, SVMEvaluator, PyTorchEvaluator, RocAucEvaluator, Logits_GraphMAE
+from libgptb.evaluators import get_split, LREvaluator, SVMEvaluator, PyTorchEvaluator, RocAucEvaluator, Logits_GraphMAE, APEvaluator
 
 
 
@@ -52,6 +52,9 @@ class GraphMAEExecutor(AbstractExecutor):
         self.deg4feat = config['deg4feat']
         self.batch_size = config['batch_size']
         self.num_class = self.config.get('num_class',2)
+        self.hidden_dim = self.config.get('nhid')
+        self.num_layers = self.config.get('layers')
+        self.label_dim = data_feature.get('label_dim')
         
         self.load_best_epoch = self.config.get('load_best_epoch', False)
         self.patience = self.config.get('patience', 50)
@@ -211,6 +214,8 @@ class GraphMAEExecutor(AbstractExecutor):
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
         for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
             self.load_model_with_epoch(epoch_idx)
+            if epoch_idx+1 > self.epochs:
+                break
             if self.downstream_task == 'original' or self.downstream_task == 'both':
                 self.model.eval()
                 x_list = []
@@ -241,6 +246,9 @@ class GraphMAEExecutor(AbstractExecutor):
                 elif self.dataset_name == 'ogbg-ppa':
                     self._logger.info('nclasses is {}'.format(self.num_class))
                     result = PyTorchEvaluator(n_features=x.shape[1],n_classes=self.num_class)(x, y, split)
+                elif self.config['dataset'] == 'ogbg-molpcba':
+                    result = APEvaluator(self.hidden_dim, self.label_dim)(x, y, split)
+                    self._logger.info(f'(E): ap={result["ap"]:.4f}')
                 else:
                     result = SVMEvaluator(linear=True)(x, y, split)
                     print(f'(E): Best test F1Mi={result["micro_f1"]:.4f}, F1Ma={result["macro_f1"]:.4f}')
@@ -316,7 +324,7 @@ class GraphMAEExecutor(AbstractExecutor):
                 self._logger.info(message)
 
             #if epoch_idx+1 in [50, 100, 500, 1000, 10000]:
-            if epoch_idx+1 in [1,10,20,40,60,80,100]:
+            if epoch_idx+1 in [10,20,40,60,80,100]:
                 model_file_name = self.save_model_with_epoch(epoch_idx)
                 self._logger.info('saving to {}'.format(model_file_name))
 

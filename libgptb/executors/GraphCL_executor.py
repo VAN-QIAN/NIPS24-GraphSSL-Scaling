@@ -209,7 +209,7 @@ class GraphCLExecutor(AbstractExecutor):
         """
         self._logger.info('Start evaluating ...')
         #for epoch_idx in [50-1, 100-1, 500-1, 1000-1, 10000-1]:
-        for epoch_idx in [10-1,20-1,40-1,60-1,80-1,100-1]:
+        for epoch_idx in [100-1]:
                 if epoch_idx+1 > self.epochs:
                     break
                 self.load_model_with_epoch(epoch_idx)
